@@ -6,6 +6,8 @@ Aplikacja Android TV obsługiwana pilotem.
 
 Od wersji 1.5 aplikacja sprawdza wydania na GitHubie i pobiera aktualizacje automatycznie. Instalację rozpoczyna poza odtwarzaniem filmu. Android może wymagać potwierdzenia instalacji pilotem — także komunikatu Google Play Protect dla nieznanego dewelopera. Pierwszy raz trzeba zezwolić Rivestream TV na instalowanie aktualizacji w ustawieniach telewizora.
 
+Na Androidzie 10+ po zakończeniu instalacji otwórz aplikację z ikony w menu TV.
+
 Ręczne sprawdzenie: **Menu pilota → Aktualizacje**.
 
 To repozytorium dystrybucji gotowych APK. Klucz podpisu aplikacji pozostaje lokalnie. Aktualizator sprawdza sumę SHA-256, identyfikator aplikacji, numer wersji i zgodność podpisu APK z zainstalowaną aplikacją.
