@@ -1,4 +1,11 @@
-*.apk
+.gradle/
+.tools/
+.artifacts/
+**/build/
+local.properties
 *.keystore
 *.jks
+*.apk
 .DS_Store
+distribution/
+.playwright-mcp/

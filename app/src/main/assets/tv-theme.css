@@ -1,0 +1,119 @@
+/* Rivestream TV: local presentation layer, independent of the site's theme setting. */
+:root, html, body {
+  --rive-card:124px;
+  --bg-color:#1b1919!important; --bg-gradient:rgba(27,25,25,.94)!important;
+  --primary-1:#202020!important; --primary-2:#94a3b8!important;
+  --primary-3:#cbd5e1!important; --primary-4:#f5f5f1!important;
+  --ascent-color:#ffd166!important; --watchPageBtn:#fff!important;
+  --callToActionBtn:#fff!important; --SysFFamily:Arial!important;
+  color-scheme:dark; background:#1b1919!important; color:#f5f5f1;
+  font-family:Arial, sans-serif!important; scroll-behavior:smooth;
+}
+*, *::before, *::after {box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body {margin:0!important; overflow-x:hidden;}
+button,input,select,textarea {font-family:Arial,sans-serif!important; font-size:16px;}
+h1,h2,h3,h4 {color:#f5f5f1!important; letter-spacing:0!important;}
+a {text-decoration:none;}
+[class*="navbar_wrapper"],[class*="mobileNavbar"],[class*="dynamicIsland"],.react-tooltip {display:none!important;}
+[class*="style_background__"] {display:block!important; width:100%!important; min-height:100vh!important;}
+[class*="style_background__"]>div {width:100%!important; min-width:0!important;}
+[class*="_Home__"] {margin:0!important; padding:0 24px 24px!important; background:#1b1919!important; width:100%!important; min-width:0!important; display:block!important; height:auto!important; overflow:visible!important;}
+[class*="style_background__"] {height:auto!important; overflow:visible!important;}
+[class*="HomeHero__"] {height:320px!important; min-height:0!important; width:calc(100% + 48px)!important; margin:0 -24px 10px!important; position:relative!important; overflow:hidden!important; border-radius:0!important;}
+[class*="HomeCarousel__"] {height:100%!important; width:100%!important; max-width:none!important; min-height:0!important; margin:0!important; border-radius:0!important;}
+[class*="carousel_images__"] {height:100%!important;}
+[class*="carousel_images__"]>div:first-child {height:100%!important; width:100%!important; position:absolute!important; top:0; left:0;}
+[class*="carousel_images__"] span {height:100%!important; width:100%!important;}
+[class*="carousel_images__"] img {width:100%!important; height:320px!important; object-fit:cover!important; opacity:.85!important;}
+[class*="HomeCarousel__"]::after {content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(27,25,25,.92),rgba(27,25,25,.08) 85%),linear-gradient(0deg,#1b1919,transparent 65%); pointer-events:none;}
+[class*="HomeHero__"] [class*="curvy"], [class*="Detail_DetailPage__"] [class*="curvy"], [class*="slide_direction__"] {display:none!important;}
+/* Remove the site's decorative frame and pseudo corners, including mobile rules. */
+[class*="HomeHeroMeta__"] {outline:none!important; outline-offset:0!important; border:0!important; box-shadow:none!important; background:transparent!important; border-radius:0!important; overflow:visible!important;}
+[class*="HomeHeroMeta__"]::before,[class*="HomeHeroMeta__"]::after {display:none!important; content:none!important;}
+[class*="HomeHero__"] [class*="HomeHeroMeta__"] {position:absolute!important; z-index:2; left:28px!important; bottom:34px!important; margin:0!important; padding:0!important; width:calc(100% - 56px)!important; align-items:flex-start!important; gap:18px!important;}
+[class*="HomeHero__"] [class*="HomeHeroMeta__"]::before {display:block!important; content:"RIVESTREAM  /  POLECANE"!important; position:static!important; width:auto!important; height:auto!important; background:none!important; color:#c7c7c7; font-size:10px; font-weight:700; letter-spacing:2px;}
+[class*="HomeHeroMeta__"] h1 {font-size:34px!important; font-weight:800!important; line-height:1.13!important; text-align:left!important; width:100%!important; margin:0!important; -webkit-line-clamp:2!important; text-shadow:0 2px 16px rgba(0,0,0,.4);}
+[class*="HomeHeroMetaRow2__"] {padding:0!important; justify-content:flex-start!important; gap:12px!important; cursor:default!important;}
+[class*="HomeHeroMetaRow2__"] [class*="type__"] {display:none!important;}
+[class*="HomeHeroMetaRow2__"] a,[class*="HomeHeroMetaRow2__"] [class*="links__"] {min-height:40px!important; padding:9px 18px!important; border-radius:4px!important; background:#484848!important; color:#fff!important; font-size:16px!important; font-weight:700; letter-spacing:0!important; gap:9px!important;}
+[class*="HomeHeroMetaRow2__"] a[href^="/watch"] {background:#ffd166!important; color:#1b1919!important;}
+[class*="HomeHeroIcons__"] {box-sizing:content-box; width:18px!important; height:18px!important; padding:11px!important; border-radius:4px!important; color:#ddd!important; background:rgba(60,60,60,.85);}
+[class*="HomeListAll__"] {width:100%!important;}
+[class*="HomeListAll__"]>h1 {font-size:20px!important; margin:16px 0 0!important; padding:0 6px; font-weight:700;}
+[class*="HomeListAll__"]>h1>div:last-child {display:none!important;}
+[class*="HomeListSection__"],[class*="ContinueWatchingListSection__"],[class*="RecommendationListSection__"] {margin:0 0 6px!important; width:100%!important; gap:12px!important; padding:14px 10px!important; scrollbar-width:none;}
+[class*="MovieCardSmall__"]:not(:has(>[class*="metaData__"])),[class*="ShowCardSmall__"]:not(:has(>[class*="metaData__"])) {width:var(--rive-card)!important; min-height:0!important; border-radius:6px!important; flex-shrink:0!important;}
+[class*="MovieCardSmall__"]:not(:has(>[class*="metaData__"]))>div,[class*="ShowCardSmall__"]:not(:has(>[class*="metaData__"]))>div {width:100%!important; height:calc(var(--rive-card) * 1.5)!important; border-radius:6px!important; background:#262323; transition:transform 160ms ease-out;}
+[class*="CardSmall__"]:not(:has(>[class*="metaData__"]))>div>[class*="img__"],[class*="CardSmall__"]:not(:has(>[class*="metaData__"]))>div>[class*="img__"]>div,[class*="CardSmall__"]:not(:has(>[class*="metaData__"]))>div span.lazy-load-image-background,[class*="CardSmall__"]:not(:has(>[class*="metaData__"]))>div img {width:100%!important; height:100%!important; margin:0!important; border-radius:6px!important; box-shadow:none!important;}
+[class*="MovieCardSmall__"] img,[class*="ShowCardSmall__"] img {object-fit:cover!important;}
+[class*="MovieCardSmall__"]:not(:has(>[class*="metaData__"])) p,[class*="ShowCardSmall__"]:not(:has(>[class*="metaData__"])) p {color:#9d9d9d!important; font-size:12px!important; line-height:16px!important; margin:9px 0 0!important; display:block!important; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+[class*="Detail_DetailPage__"] {margin:0!important; padding:24px!important; width:100%!important; min-height:100vh!important; height:auto!important; display:flex!important; flex-direction:column!important; overflow:visible!important; gap:24px;}
+[class*="Detail_DetailPage__"] [class*="biggerPic__"] {width:100%!important; height:330px!important; min-height:330px!important; flex:none!important; margin:0!important; border-radius:6px!important; overflow:hidden!important;}
+[class*="Detail_DetailPage__"] [class*="biggerPic__"]::after {content:""; position:absolute; inset:0; background:linear-gradient(0deg,rgba(27,25,25,.97),transparent 95%),linear-gradient(90deg,rgba(27,25,25,.6),transparent); pointer-events:none;}
+[class*="Detail_DetailBanner__"] {z-index:2; bottom:26px!important; left:24px!important; width:calc(100% - 48px)!important; padding:0!important; gap:18px;}
+[class*="Detail_DetailBanner__"]>[class*="poster__"] {display:none!important;}
+[class*="Detail_DetailBanner__"] [class*="HomeHeroMeta__"] {position:static!important; left:auto!important; bottom:auto!important; margin:0!important; padding:0!important; max-width:none!important; min-width:0!important; align-items:flex-start!important; gap:18px!important; letter-spacing:0!important;}
+[class*="Detail_DetailPage__"] [class*="biggerDetail__"] {width:100%!important; max-width:none!important; min-height:0!important; flex:none!important;}
+[class*="MetaDetailPage__"] {border-radius:6px!important; background:#1c1c1c!important; height:auto!important; max-height:none!important; overflow:visible!important;}
+[class*="MetaDetailPage__"] [class*="MetaDetails__"] {padding:54px 20px 20px!important;}
+/* Content pages use the native rail, so remove the website's reserved nav space. */
+[class*="Search_searchPage__"],[class*="Search_SearchPage__"],[class*="Settings_settingsPage__"],[class*="Library_libraryPage__"],[class*="Library_LibraryPage__"],[class*="Movie_MoviePage__"],[class*="Show_ShowPage__"] {padding-left:28px!important; padding-right:28px!important; width:100%!important;}
+[class*="_MoviePage__"] {width:100%!important; padding:28px 24px!important;}
+[class*="_MoviePage__"]>h1 {font-size:28px!important; margin:0 0 20px!important;}
+[class*="Search_MoviePage__"] [class*="movieList__"] {display:grid!important; grid-template-columns:repeat(auto-fill,minmax(250px,1fr))!important; gap:14px!important; padding:8px 4px!important;}
+[class*="Search_MoviePage__"] [class*="CardSmall__"] {width:auto!important; min-width:0!important;}
+[class*="Search_MoviePage__"] [class*="metaData__"] {flex:1!important; min-width:0!important; width:auto!important; margin:0!important;}
+[class*="_MoviePage__"]:not([class*="Search_"]) [class*="movieList__"] {width:100%!important; padding:20px 6px!important; display:grid!important; grid-template-columns:repeat(auto-fill,var(--rive-card))!important; justify-content:space-between!important; gap:22px 12px!important;}
+[class*="_MoviePage__"] [class*="category__"] {margin:0 0 16px!important; min-height:38px; gap:18px!important;}
+[class*="_MoviePage__"] [class*="category__"]>p {padding:8px 4px;}
+[class*="Search_InputWrapper__"] {justify-content:flex-start!important; padding-right:0!important;}
+[class*="Search_InputWrapper__"] [class*="searchInput__"] {margin:0 0 18px!important; width:100%!important; height:48px; padding:12px 16px!important;}
+[class*="Search_inputShortcut__"] {display:none!important;}
+[class*="Search_searchModeWrapper__"] {justify-content:flex-start!important; margin:0 0 24px!important; gap:12px!important;}
+[class*="Search_searchOption__"] {border-radius:4px!important; padding:9px 14px!important;}
+[class*="Settings_group__"] a,[class*="Settings_group__"] button {background:#292929!important; color:#f5f5f1!important; border:1px solid #454545!important; border-radius:4px!important;}
+input:not([type="checkbox"]):not([type="range"]):not([type="radio"]),textarea,select {background:#292929!important; color:#fff!important; border:1px solid #555!important; border-radius:4px!important; min-height:40px; padding:8px 12px;}
+input::placeholder,textarea::placeholder {color:#a3a3a3!important; opacity:1;}
+.btn {background:#ffd166!important; color:#1b1919!important; border-radius:4px!important; min-height:38px; padding:8px 14px!important;}
+[role="dialog"],dialog[open],[class*="modalCard__"],[class*="settingsPopoverCard__"] {background:#202020!important; color:#eee!important; border:1px solid #444!important; border-radius:8px!important; box-shadow:0 24px 80px rgba(0,0,0,.7)!important; max-height:86vh!important;}
+[class*="modalOverlay"],[class*="Modal_overlay__"],[class*="overlay__"]:has([role="dialog"]) {background:rgba(0,0,0,.8)!important;}
+/* A single focus ring on the actual control. Ancestors never inherit it. */
+a:focus,button:focus,input:focus,select:focus,textarea:focus,[tabindex]:focus {outline:none!important; box-shadow:none!important;}
+html [data-rive-focus="true"][data-rive-focus] {outline:2px solid #fff!important; outline-offset:3px!important; box-shadow:0 5px 18px rgba(0,0,0,.45)!important; border-radius:4px!important;}
+html [class*="HomeHeroMetaRow2__"] a[data-rive-focus="true"] {background:#fff!important; color:#1b1919!important; outline:2px solid #fff!important; outline-offset:3px!important;}
+html [data-rive-focus="true"][class*="CardSmall__"] {outline:none!important; box-shadow:none!important;}
+html [data-rive-focus="true"][class*="CardSmall__"]>div:first-child {border-radius:6px; transition:transform 160ms ease-out; transform:scale(1.08); box-shadow:0 0 0 3px #fff, 0 12px 28px rgba(0,0,0,.6)!important;}
+html [data-rive-focus="true"][class*="CardSmall__"] p,html [data-rive-focus="true"][class*="CardSmall__"] h1 {color:#fff!important;}
+[class*="CardSmall__"]:has(>[class*="metaData__"]) {gap:16px!important; padding:6px!important; border-radius:8px!important; align-items:center!important;}
+html [data-rive-focus="true"][class*="CardSmall__"]:has(>[class*="metaData__"]) {background:rgba(255,255,255,.08)!important;}
+html [data-rive-focus="true"] input,html [data-rive-focus="true"] button {outline:none!important;}
+::-webkit-scrollbar {width:4px; height:0;}
+::-webkit-scrollbar-thumb {background:#454545; border-radius:2px;}
+@media(prefers-reduced-motion:reduce) {html {scroll-behavior:auto;} * {transition:none!important;}}
+/* Detail tabs stay in document flow and remain reachable with the remote. */
+[class*="MetaDetailPage__"] [class*="MetaDetails__"] {padding:20px!important;}
+[class*="MetaDetails__"] > [class*="category__"] {position:sticky!important; top:0!important; left:auto!important; width:100%!important; display:flex!important; flex-wrap:nowrap!important; gap:12px!important; margin:0 0 20px!important; padding:8px 4px!important; background:#1c1c1c!important; z-index:4; overflow-x:auto!important;}
+[class*="MetaDetails__"] > [class*="category__"] > p {flex:none!important; margin:0!important; padding:10px 16px!important; border-radius:6px!important; cursor:pointer;}
+[class*="MetaDetails__"] > [class*="category__"] > p[aria-selected="true"] {background:#34302a!important; color:#ffd166!important;}
+html,body {scroll-padding:24px;}
+[data-rive-focus] {scroll-margin:24px;}
+/* Loading uses one native overlay; the site's transient progress bars stay hidden. */
+#nprogress {display:none!important;}
+/* Keep the actual embed surface full-screen even if a fetched dvh fallback fails. */
+[class*="Watch_watch__"] {height:100vh!important; min-height:100vh!important; width:100%!important;}
+iframe[class*="Watch_iframe__"] {display:block!important; height:100vh!important; min-height:100vh!important; width:100%!important; border:0!important;}
+
+/* Native TV lists own presentation and focus from the first frame. */
+html[data-rive-native-select] [class*="desktopPopover__"],
+html[data-rive-native-select] [class*="mobileBackdrop__"],
+html[data-rive-native-select] [class*="mobileSheet__"],
+html[data-rive-native-select] [role="listbox"] {visibility:hidden!important; pointer-events:none!important;}
+
+/* Held D-pad navigation must not keep restarting smooth-scroll animations. */
+html[data-rive-repeat],html[data-rive-repeat] *,html[data-rive-scrolling],html[data-rive-scrolling] * {scroll-behavior:auto!important; overflow-anchor:none!important;}
+
+.skeleton,.skeleton::before,.skeleton::after,.react-loading-skeleton,.react-loading-skeleton::before,.react-loading-skeleton::after {animation:none!important;}
+.react-loading-skeleton::after {display:none!important;}
+[class*="watchlistItems__"] {height:auto!important; width:var(--rive-card)!important; max-width:none!important; flex-shrink:0!important; align-items:stretch!important;}
+[class*="watchlistItems__"] [class*="watchProgress__"] {top:calc(var(--rive-card) * 1.5 - 4px)!important; height:4px!important; border-radius:0 0 0 6px!important; background:#ffd166!important; z-index:2; pointer-events:none;}
+[class*="watchlistItems__"] [class*="bookmarkTvData__"] {top:6px!important; bottom:auto!important; left:6px!important; z-index:2; padding:2px 6px!important; font-size:11px!important; border-radius:4px!important; border:0!important; background:rgba(20,20,20,.85)!important; color:#fff!important;}

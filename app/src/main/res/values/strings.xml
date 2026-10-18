@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_servers">Serwery</string>
+    <string name="source_blocked">To źródło wymaga weryfikacji dostawcy. Wybierz inny serwer.</string>
+    <string name="error_refresh">Odśwież</string>
+    <string name="update_installing">Instaluję aktualizację Rivestream TV…</string>
+</resources>
