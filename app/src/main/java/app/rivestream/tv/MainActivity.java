@@ -75,6 +75,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private View customView;
     private WebChromeClient.CustomViewCallback customCallback;
     private String navigationScript, bootstrapScript, compatibilityScript;
+    private ViewingStore viewingStore;
+    private androidx.webkit.ScriptHandler storageBootstrap;
     private ValueAnimator railAnimator;
     private float railReveal=1f;
     private int pageGeneration;
@@ -153,12 +155,17 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web,true);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        viewingStore=new ViewingStore(this);
+        if(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)){
+            WebViewCompat.addWebMessageListener(web,"RiveTVStorage",new HashSet<>(Arrays.asList("https://www.rivestream.app","https://rivestream.app")),
+                (view,message,origin,mainFrame,reply)->{if(mainFrame){viewingStore.accept(message.getData());refreshStorageBootstrap();}});
+        }
         bootstrapScript=readAsset("tv-bootstrap.js");
-        compatibilityScript=readAsset("tv-compat.js");
+        compatibilityScript=readAsset("tv-compat.js")+"\n"+readAsset("tv-playback.js");
         if(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)){
             documentStartSupported=true;
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));
-            WebViewCompat.addDocumentStartJavaScript(web,bootstrapScript,new HashSet<>(Arrays.asList("https://www.rivestream.app","https://rivestream.app")));
+            refreshStorageBootstrap();
         }
         navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js");
         web.setOnFocusChangeListener((v,focus)->{if(focus)setRailExpanded(false);else stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
@@ -229,7 +236,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             @Override public void onPageStarted(WebView w,String url,android.graphics.Bitmap icon){
                 updateNavigation(url);
                 beginLoading(url);
-                if(!documentStartSupported && isRive(Uri.parse(url)))w.evaluateJavascript(compatibilityScript+"\n"+bootstrapScript,null);
+                if(!documentStartSupported && isRive(Uri.parse(url)))w.evaluateJavascript(viewingStore.restoreScript()+compatibilityScript+"\n"+bootstrapScript,null);
             }
             @Override public void onPageFinished(WebView w,String url){
                 if(pageFailed) return;
@@ -388,7 +395,13 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         },1500);
     }
     private void injectNavigation(WebView view){
-        view.evaluateJavascript(navigationScript,result->{if(web!=null)syncWebFocus(web.hasFocus() && !pointerMode && activeDialog==null);});
+        view.evaluateJavascript(viewingStore.restoreScript()+navigationScript,result->{if(web!=null)syncWebFocus(web.hasFocus() && !pointerMode && activeDialog==null);});
+    }
+    private void refreshStorageBootstrap(){
+        if(!documentStartSupported || web==null || bootstrapScript==null)return;
+        if(storageBootstrap!=null)storageBootstrap.remove();
+        storageBootstrap=WebViewCompat.addDocumentStartJavaScript(web,viewingStore.restoreScript()+bootstrapScript,
+            new HashSet<>(Arrays.asList("https://www.rivestream.app","https://rivestream.app")));
     }
     private void pollPageReady(int generation){
         handler.postDelayed(()->{
@@ -694,7 +707,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         web.evaluateJavascript("window.RiveTV ? RiveTV.target() : null",raw->{
             try{
                 JSONObject target=new JSONObject(raw);
-                if(target.optBoolean("search")){showSearchEditor(target);}
+                if(target.optBoolean("playback")){web.evaluateJavascript("window.RiveTV && RiveTV.media('toggle')",null);}
+                else if(target.optBoolean("search")){showSearchEditor(target);}
                 else if(target.optBoolean("select")){showSelect(target);}
                 else if(target.optBoolean("tap")){
                     if(target.optBoolean("player"))web.evaluateJavascript("window.RiveTV && RiveTV.enterPlayer()",null);
@@ -734,8 +748,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             if(!down && !centerPressedHere)return true;
             if(down && event.getRepeatCount()==0){centerPressedHere=true;centerLongPress=false;handler.postDelayed(longPress,600);}
             else if(down && event.isLongPress() && !centerLongPress){handler.removeCallbacks(longPress);longPress.run();}
-            else if(!down){centerPressedHere=false;handler.removeCallbacks(longPress);if(!centerLongPress){if(customView!=null&&!pointerMode)return super.dispatchKeyEvent(event);activate();}}
-            if(customView!=null&&!pointerMode&&!centerLongPress)return super.dispatchKeyEvent(event);
+            else if(!down){centerPressedHere=false;handler.removeCallbacks(longPress);if(!centerLongPress){if(customView!=null&&!pointerMode)web.evaluateJavascript("window.RiveTV && RiveTV.media('toggle')",null);else activate();}}
             return true;
         }
         if(key>=KeyEvent.KEYCODE_DPAD_UP && key<=KeyEvent.KEYCODE_DPAD_RIGHT){
@@ -769,7 +782,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private void goBack(){
         if(customView!=null){hideFullscreen();return;}
         if(pointerMode){togglePointer();return;}
-        if(web!=null){web.evaluateJavascript("window.RiveTV && (RiveTV.closeDropdown() || RiveTV.releasePlayer())",result->{if(!"true".equals(result))finishBack();});return;}
+        if(web!=null){web.evaluateJavascript("window.RiveTV && (RiveTV.closeDropdown() || RiveTV.revealPlayback() || RiveTV.releasePlayer())",result->{if(!"true".equals(result))finishBack();});return;}
         finishBack();
     }
     private void finishBack(){

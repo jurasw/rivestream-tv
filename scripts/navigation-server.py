@@ -1,12 +1,15 @@
 """Serve only the navigation fixture and its assets on a free loopback port."""
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sys
 
 root = Path(__file__).resolve().parent.parent
 allowed = {
+    "/tests/playback-frame.html": ("tests/playback-frame.html", "text/html"),
     "/app/src/main/assets/tv-compat.js": ("app/src/main/assets/tv-compat.js", "text/javascript"),
     "/app/src/main/assets/tv-bootstrap.js": ("app/src/main/assets/tv-bootstrap.js", "text/javascript"),
+    "/app/src/main/assets/tv-playback.js": ("app/src/main/assets/tv-playback.js", "text/javascript"),
+    "/tests/playback.html": ("tests/playback.html", "text/html"),
     "/tests/navigation.html": ("tests/navigation.html", "text/html"),
     "/app/src/main/assets/tv-navigation.js": ("app/src/main/assets/tv-navigation.js", "text/javascript"),
     "/app/src/main/assets/tv-theme.css": ("app/src/main/assets/tv-theme.css", "text/css"),
@@ -25,6 +28,6 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-server = HTTPServer(("127.0.0.1", 0), Handler)
+server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 Path(sys.argv[1]).write_text(str(server.server_port))
 server.serve_forever()

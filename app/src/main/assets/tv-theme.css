@@ -1,4 +1,10 @@
 /* Rivestream TV: local presentation layer, independent of the site's theme setting. */
+#rive-next-episode {position:fixed;right:28px;bottom:32px;z-index:2147483646;display:flex;gap:12px;align-items:center;}
+#rive-next-episode[hidden],#rive-next-episode [hidden] {display:none!important;}
+#rive-next-episode button,#rive-next-settings button,#rive-next-settings select {padding:12px 18px;border:1px solid #888;border-radius:6px;background:#303030;color:#fff;}
+#rive-next-episode button:first-of-type {background:#ffd166;color:#1b1919;font-weight:bold;}
+#rive-next-settings {display:flex;flex-wrap:wrap;align-items:center;gap:14px;width:100%;padding:20px 0;}
+#rive-next-settings p {width:100%;margin:0;line-height:1.5;}
 :root, html, body {
   --rive-card:124px;
   --bg-color:#1b1919!important; --bg-gradient:rgba(27,25,25,.94)!important;
@@ -102,6 +108,9 @@ html,body {scroll-padding:24px;}
 /* Keep the actual embed surface full-screen even if a fetched dvh fallback fails. */
 [class*="Watch_watch__"] {height:100vh!important; min-height:100vh!important; width:100%!important;}
 iframe[class*="Watch_iframe__"] {display:block!important; height:100vh!important; min-height:100vh!important; width:100%!important; border:0!important;}
+html[data-rive-cinema="hidden"] [class*="edgeHandleContainer__"],
+html[data-rive-cinema="hidden"] [class*="watchBarContainer__"],
+html[data-rive-cinema="hidden"] [class*="Watch_backBtn__"] {visibility:hidden!important;pointer-events:none!important;}
 
 /* Native TV lists own presentation and focus from the first frame. */
 html[data-rive-native-select] [class*="desktopPopover__"],

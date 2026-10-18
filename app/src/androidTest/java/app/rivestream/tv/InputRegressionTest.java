@@ -22,9 +22,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class InputRegressionTest extends Instrumentation {
     private MainActivity activity;
     private WebView web;
-    private boolean liveNavigation,updaterTests;
+    private boolean liveNavigation,updaterTests,viewingTests;
     private final StringBuilder results=new StringBuilder();
-    @Override public void onCreate(Bundle args){super.onCreate(args);liveNavigation=args!=null && "true".equals(args.getString("liveNavigation"));updaterTests=args!=null && "true".equals(args.getString("updaterTests"));start();}
+    @Override public void onCreate(Bundle args){super.onCreate(args);liveNavigation=args!=null && "true".equals(args.getString("liveNavigation"));updaterTests=args!=null && "true".equals(args.getString("updaterTests"));viewingTests=args!=null && "true".equals(args.getString("viewingTests"));start();}
     private Object field(String name) throws Exception {Field f=MainActivity.class.getDeclaredField(name);f.setAccessible(true);return f.get(activity);}
     private void invoke(String name,Class<?>[] types,Object... args) throws Exception {Method m=MainActivity.class.getDeclaredMethod(name,types);m.setAccessible(true);m.invoke(activity,args);}
     private String js(String script) throws Exception {
@@ -85,6 +85,23 @@ public final class InputRegressionTest extends Instrumentation {
     @Override public void onStart(){
         Bundle result=new Bundle();int outcome=Activity.RESULT_CANCELED;
         try{
+            if(viewingTests){
+                android.content.SharedPreferences prefs=getContext().getSharedPreferences("viewing_data",0);
+                prefs.edit().clear().commit();
+                ViewingStore store=new ViewingStore(getContext());
+                store.accept("{\"key\":\"RiveStreamWatchlist\",\"value\":\"{\\\"movie\\\":[\\\"42\\\"]}\"}");
+                store.accept("{\"key\":\"RiveTVProgress\",\"value\":\"{\\\"tv:42:1:2\\\":{\\\"time\\\":330}}\"}");
+                check("favorites survive a new viewing store instance",new ViewingStore(getContext()).restoreScript().contains("RiveStreamWatchlist"));
+                check("episode progress survives a new viewing store instance",new ViewingStore(getContext()).restoreScript().contains("330"));
+                store.accept("{\"key\":\"rive_trakt_credentials\",\"value\":\"secret\"}");
+                check("native backup rejects credentials",!prefs.contains("rive_trakt_credentials"));
+                store.accept("broken");store.accept("{\"key\":\"unknown\",\"value\":\"data\"}");
+                check("malformed messages leave viewing data intact",prefs.contains("RiveTVProgress")&&!prefs.contains("unknown"));
+                store.accept("{\"key\":\"RiveStreamWatchlist\",\"value\":null}");
+                check("removed favorites cannot return from backup",!new ViewingStore(getContext()).restoreScript().contains("RiveStreamWatchlist"));
+                prefs.edit().clear().commit();
+                result.putString("stream","\n"+results);result.putInt("passed",5);finish(Activity.RESULT_OK,result);return;
+            }
             AccessibilityServiceInfo service=getUiAutomation().getServiceInfo();service.flags|=AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;getUiAutomation().setServiceInfo(service);
             Intent intent=new Intent(Intent.ACTION_MAIN).setClassName(getTargetContext(),MainActivity.class.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             activity=(MainActivity)startActivitySync(intent);web=(WebView)field("web");
@@ -145,6 +162,27 @@ public final class InputRegressionTest extends Instrumentation {
             waitJs("document.activeElement.id==='result'");
             long nextHidden=SystemClock.uptimeMillis()+4000;while(systemKeyboardShown()&&SystemClock.uptimeMillis()<nextHidden)Thread.sleep(80);
             check("TV keyboard Next arrow commits and hides the IME",field("searchEditor")==null && !systemKeyboardShown());
+            load("/watch?type=tv&id=42&season=1&episode=2","<video id='player' style='width:640px;height:360px'></video>");
+            js("(()=>{window.testPaused=false;let v=document.getElementById('player');Object.defineProperties(v,{paused:{get:()=>window.testPaused},duration:{get:()=>1200},currentTime:{get:()=>20},readyState:{get:()=>4}});v.pause=()=>{window.testPaused=true};v.play=()=>{window.testPaused=false;return Promise.resolve()};RiveTV.first();return true})()");
+            long centerDown=SystemClock.uptimeMillis();key(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);
+            check("center down does not toggle early","false".equals(js("window.testPaused")));
+            // sendKeySync marks its first repeated DOWN as a long press; dispatch
+            // a plain repeat here to exercise repeat suppression independently.
+            long repeatedCenterDown=centerDown;
+            runOnMainSync(()->activity.dispatchKeyEvent(new KeyEvent(repeatedCenterDown,SystemClock.uptimeMillis(),KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_CENTER,2)));
+            check("center repeat does not toggle playback","false".equals(js("window.testPaused")));
+            key(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);
+            waitJs("window.testPaused===true");
+            check("center release pauses playback once","true".equals(js("window.testPaused")));
+            Thread.sleep(1300);check("automatic start preserves remote pause","true".equals(js("window.testPaused")));
+            centerDown=SystemClock.uptimeMillis();key(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);key(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);waitJs("window.testPaused===false");
+            check("second center press resumes playback","false".equals(js("window.testPaused")));
+            runOnMainSync(()->web.getWebChromeClient().onShowCustomView(new android.widget.FrameLayout(activity),()->{}));
+            centerDown=SystemClock.uptimeMillis();key(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);key(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);waitJs("window.testPaused===true");
+            check("fullscreen center pauses playback","true".equals(js("window.testPaused")));
+            centerDown=SystemClock.uptimeMillis();key(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);key(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DPAD_CENTER,centerDown,0);waitJs("window.testPaused===false");
+            check("fullscreen second center resumes playback","false".equals(js("window.testPaused")));
+            runOnMainSync(()->{try{invoke("hideFullscreen",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});
             load("/watch?type=movie&id=45745","<button id='source' aria-haspopup='listbox' aria-expanded='false' onclick=\"this.setAttribute('aria-expanded','true');document.getElementById('servers').hidden=false\">Servers</button><div id='servers' role='listbox' hidden><button role='option'>Server 1</button><button role='option'>Server 2</button></div>");
             runOnMainSync(()->{try{invoke("showSourceError",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});
             check("blocked provider offers Servers instead of reload","Serwery".contentEquals(((android.widget.Button)field("errorRetry")).getText()) && !((Boolean)field("pageFailed")));
@@ -162,7 +200,7 @@ public final class InputRegressionTest extends Instrumentation {
             runOnMainSync(()->{try{((android.app.Dialog)field("activeDialog")).dismiss();invoke("setPlaybackMode",new Class<?>[]{String.class},"embed");}catch(Exception e){throw new RuntimeException(e);}});
             waitJs("localStorage.getItem('RiveStreamWatchMode')==='embed' && localStorage.getItem('RiveStreamEmbedMode')==='true'");
             check("Embed recovery persists the mode without React","\"embed\"".equals(js("localStorage.getItem('RiveStreamWatchMode')")));
-            result.putString("stream","\n"+results);result.putInt("passed",21);outcome=Activity.RESULT_OK;
+            result.putString("stream","\n"+results);result.putInt("passed",28);outcome=Activity.RESULT_OK;
         }catch(Throwable error){result.putString("stream","\n"+results+"FAIL "+error+"\n");}
         finally{if(activity!=null)runOnMainSync(()->activity.finish());}
         finish(outcome,result);

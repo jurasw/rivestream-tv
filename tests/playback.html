@@ -1,0 +1,86 @@
+<!doctype html><meta charset="utf-8"><title>Playback regression</title>
+<link rel="stylesheet" href="/app/src/main/assets/tv-theme.css">
+<body><pre id="result"></pre>
+<script>
+(async function () {
+ var results=[], count=0;
+ function check(name,value) {results.push((value?'PASS ':'FAIL ')+name);count++;}
+ try {
+  localStorage.clear();
+  var clock=100000, realNow=Date.now;Date.now=()=>clock;
+  var tick;window.setInterval=fn=>{tick=fn;return 1;};
+  history.replaceState({},'', '/settings');
+  var group=document.createElement('div');group.className='style_group__test';group.innerHTML='<button id="mode">Dark</button>';document.body.appendChild(group);
+  eval(await (await fetch('/app/src/main/assets/tv-playback.js')).text());
+  check('auto next is off by default',document.querySelector('#rive-auto-next').getAttribute('aria-checked')==='false');
+  document.querySelector('#rive-auto-next').click();
+  check('auto next switch saves enabled preference',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).autoNext===true);
+  var seconds=document.querySelector('#rive-outro-seconds');seconds.value='120';seconds.dispatchEvent(new Event('change'));
+  check('outro lead time persists',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).outroSeconds===120);
+  history.replaceState({},'', '/watch?type=tv&id=1&season=1&episode=1');
+  var handle=document.createElement('button');handle.setAttribute('aria-label','Toggle Quick Menu');document.body.appendChild(handle);
+  var calls=0, props={season:'1',episode:'1',hasNextEpisode:true,onNextEpisode:()=>calls++};
+  var fiberRoot={stateNode:{}};fiberRoot.stateNode.current=fiberRoot;
+  handle.__reactFiber$fixture={memoizedProps:props,return:fiberRoot};
+  var video=document.createElement('video');document.body.appendChild(video);
+  var time=20,paused=false,ended=false,ready=4;
+  Object.defineProperties(video,{duration:{get:()=>1200},currentTime:{get:()=>time,set:v=>time=v},paused:{get:()=>paused},ended:{get:()=>ended},readyState:{get:()=>ready}});
+  video.pause=()=>{paused=true;};video.play=()=>{paused=false;return Promise.resolve();};
+  function step(n=1) {for(var i=0;i<n;i++){clock+=1000;tick();}}
+  function panel() {return document.querySelector('#rive-next-episode');}
+  step();check('settings removed on leaving settings',!document.querySelector('#rive-next-settings'));
+  check('no prompt during episode',!panel()||panel().hidden);
+  eval(await (await fetch('/app/src/main/assets/tv-navigation.js')).text());
+  time=1081;step(2);check('prompt appears at configured outro time',panel()&&!panel().hidden);
+  check('prompt offers immediate next episode',panel().querySelector('button').textContent.startsWith('Następny odcinek'));
+  check('next button automatically receives remote focus',document.querySelector('[data-rive-focus]')===panel().querySelector('button'));
+  check('next button has no surrounding caption or background',!panel().querySelector('span')&&getComputedStyle(panel()).backgroundColor==='rgba(0, 0, 0, 0)'&&getComputedStyle(panel()).padding==='0px');
+  check('highlighted next button takes priority over pause',RiveTV.target().playback!==true);
+  paused=true;step();var caption=panel().querySelector('button').textContent;step(3);
+  check('pause freezes countdown',panel().querySelector('button').textContent===caption&&calls===0);
+  paused=false;ready=2;step();caption=panel().querySelector('button').textContent;step(3);
+  check('buffering freezes countdown',panel().querySelector('button').textContent===caption&&calls===0);ready=4;
+  paused=false;step();panel().querySelectorAll('button')[1].click();step(20);
+  check('cancel prevents automatic transition',calls===0);
+  check('cancel keeps manual next available',!panel().hidden&&panel().querySelectorAll('button')[1].hidden);
+  RiveTV.activate();check('manual next transitions once',calls===1);
+  RiveTVPlayback.next();check('duplicate next is ignored',calls===1);
+  check('skipping outro completes progress',JSON.parse(localStorage.getItem('RiveTVProgress'))['tv:1:1:1'].complete===true);
+  props.episode='2';history.replaceState({},'', '/watch?type=tv&id=1&season=1&episode=2');time=1081;paused=false;step(17);
+  check('new episode resets cancellation and auto advances',calls===2);
+  props.episode='3';props.hasNextEpisode=false;history.replaceState({},'', '/watch?type=tv&id=1&season=1&episode=3');paused=false;step(20);
+  check('last episode has no prompt or transition',panel().hidden&&calls===2);
+  props.hasNextEpisode=true;props.episode='4';history.replaceState({},'', '/watch?type=tv&id=1&season=1&episode=4');time=1081;paused=false;window.__riveSleepEndOfVideoActive=true;step(20);
+  check('sleep timer blocks prompt and auto next',panel().hidden&&calls===2);window.__riveSleepEndOfVideoActive=false;
+  time=900;step();check('rewind out of outro hides prompt',panel().hidden);
+  var oldProps=props;props={season:'1',episode:'4',hasNextEpisode:false,onNextEpisode:()=>calls++};
+  var newRoot={stateNode:fiberRoot.stateNode};fiberRoot.stateNode.current=newRoot;
+  handle.__reactFiber$fixture.alternate={memoizedProps:props,return:newRoot};
+  check('availability uses committed React alternate',RiveTVPlayback.next()===false);
+  props.hasNextEpisode=true;props.episode='99';check('stale episode props cannot transition',RiveTVPlayback.next()===false);props.episode='4';
+  history.replaceState({},'', '/settings');step();document.querySelector('#rive-auto-next').click();
+  check('switch can disable auto next',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).autoNext===false);
+  history.replaceState({},'', '/watch?type=tv&id=1&season=1&episode=4');time=1200;paused=true;ended=true;step();
+  var siteEnded=0;video.addEventListener('ended',()=>siteEnded++);video.dispatchEvent(new Event('ended'));step(20);
+  check('disabled auto next blocks site unconditional ended handler',siteEnded===0&&calls===2);
+  check('ended episode still offers manual next',!panel().hidden);
+  RiveTV.first();RiveTV.move('down');
+  check('Down on remote focuses next episode directly',document.querySelector('[data-rive-focus]')===panel().querySelector('button'));
+  var frame=document.createElement('iframe');document.body.appendChild(frame);
+  var savedProgress=localStorage.getItem('RiveTVProgress');
+  window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,data:{riveTV:'state',state:{session:'stale',time:1199,duration:1200}}}));
+  check('stale provider report cannot alter progress',localStorage.getItem('RiveTVProgress')===savedProgress);
+  window.dispatchEvent(new MessageEvent('message',{source:window,data:{riveTV:'state',state:{session:'stale',time:1,duration:1200}}}));
+  check('messages outside child frames are ignored',localStorage.getItem('RiveTVProgress')===savedProgress);
+  history.replaceState({},'', '/watch?type=movie&id=1');time=1199;paused=false;ended=false;step(20);
+  check('movies never offer next episode',panel().hidden&&calls===2);
+  history.replaceState({},'', '/watch?type=movie&id=2');time=0;paused=false;step();
+  RiveTVPlayback.command('toggle');step(3);
+  check('pause at time zero survives autostart ticks',paused&&time===0);
+  RiveTVPlayback.command('toggle');check('second toggle resumes at time zero',!paused&&time===0);
+  check('removed intro command is ignored',RiveTVPlayback.command('intro')===false&&time===0);
+  Date.now=realNow;
+ } catch (error) {results.push('FAIL '+error.stack);}
+ document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
+})();
+</script>

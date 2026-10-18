@@ -149,6 +149,7 @@
   }
   function setFocus(el, scroll, repeated) {
     if (!el) return false;
+    if (window.RiveTVPlayback && RiveTVPlayback.hidden() && !el.closest('#rive-next-episode')) return false;
     Array.prototype.forEach.call(document.querySelectorAll('[data-rive-focus]'), function (old) {old.removeAttribute('data-rive-focus');});
     selected = el;
     if (!active) return true;
@@ -168,6 +169,11 @@
     return true;
   }
   function first() {
+    if (window.RiveTVPlayback && RiveTVPlayback.hidden()) {
+      if (focusNext()) return true;
+      if (selected) {selected.removeAttribute('data-rive-focus');selected.blur();}
+      selected = null;return false;
+    }
     var visible = collect().filter(function (el) {
       var r = el.getBoundingClientRect();
       return r.top >= 0 && r.top < innerHeight && r.left >= 0 && r.left < innerWidth;
@@ -179,6 +185,14 @@
   }
   function stopMove() { document.documentElement.removeAttribute('data-rive-repeat'); }
   function move(direction, repeated) {
+    if (window.RiveTVPlayback && RiveTVPlayback.isWatch()) {
+      if (RiveTVPlayback.hidden()) {
+        if (direction === 'down') {revealPlayback();return 'ok';}
+        if (direction === 'left' || direction === 'right') RiveTVPlayback.command(direction === 'right' ? 'forward' : 'rewind');
+        return 'ok';
+      }
+      RiveTVPlayback.touch();
+    }
     if (repeated) document.documentElement.setAttribute('data-rive-repeat', 'true');
     else stopMove();
     active = true;
@@ -254,7 +268,18 @@
     dirty = true;
     return direction === 'up' ? 'edge-up' : 'ok';
   }
+  function focusNext() {
+    var next = document.querySelector('#rive-next-episode button');
+    if (!available(next) || dialogScope() !== document) return false;
+    active = true;dirty = true;playerEngaged = false;
+    return setFocus(next,false);
+  }
+  function playbackTarget() {
+    return window.RiveTVPlayback && RiveTVPlayback.isWatch() &&
+      (RiveTVPlayback.hidden() && !(selected && selected.closest('#rive-next-episode') && available(selected)) || selected && /^(IFRAME|VIDEO)$/.test(selected.tagName) && available(selected) && dialogScope() === document);
+  }
   function target() {
+    if (playbackTarget()) return {playback:true};
     collect();
     if (!selected || !available(selected)) first();
     if (!selected) return null;
@@ -273,6 +298,8 @@
       x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight };
   }
   function activate() {
+    if (playbackTarget()) return RiveTVPlayback.command('toggle');
+    if (window.RiveTVPlayback) RiveTVPlayback.touch();
     collect();
     if (!selected || !available(selected)) first();
     if (!selected) return false;
@@ -289,6 +316,7 @@
     return dropdownTrigger ? 'dropdown' : true;
   }
   function sources() {
+    revealPlayback();
     var trigger = document.getElementById('source');
     if (!available(trigger)) return false;
     active = true;
@@ -377,7 +405,17 @@
     if (control) setFocus(control);
     return true;
   }
+  function revealPlayback() {
+    if (!window.RiveTVPlayback || !RiveTVPlayback.reveal()) return false;
+    active = true;dirty = true;playerEngaged = false;selected = null;
+    var control = collect().filter(function (el) {return el.tagName !== 'IFRAME' && el.tagName !== 'VIDEO';})[0];
+    var next = document.querySelector('#rive-next-episode button');
+    if (next && available(next)) setFocus(next,false);
+    else if (control) setFocus(control,false);
+    return true;
+  }
   function media(action) {
+    if (window.RiveTVPlayback && RiveTVPlayback.isWatch()) return RiveTVPlayback.command(action);
     var found = false;
     function visit(doc) {
       Array.prototype.forEach.call(doc.querySelectorAll('video,audio'), function (v) {
@@ -490,6 +528,6 @@
   }
   function resume() {active = true; first();}
   window.RiveTV = { sources:sources, stopMove:stopMove, finishEditing:finishEditing, pageState:pageState, first: first, move: move, target: target, activate: activate, choose: choose, dropdown: dropdown, closeDropdown: closeDropdown, search: search, media: media, suspend: suspend, resume: resume,
-    enterPlayer:function () {playerEngaged=true;}, releasePlayer:releasePlayer };
+    focusNext:focusNext, revealPlayback:revealPlayback, enterPlayer:function () {playerEngaged=true;}, releasePlayer:releasePlayer };
   setTimeout(first, 350);
 })();

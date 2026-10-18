@@ -2,7 +2,7 @@
 <html lang="pl"><head><meta charset="utf-8"><title>TV navigation tests</title>
 <link rel="stylesheet" href="../app/src/main/assets/tv-theme.css">
 <style>
-body{margin:0;padding:30px;font:16px sans-serif}a,button{display:inline-block;width:140px;height:50px;margin:15px}#row{margin-top:60px}#off{display:none}#result{white-space:pre}
+body{margin:0;padding:30px;font:16px sans-serif}a,button{display:inline-block;width:140px;height:50px;margin:15px}#row{margin-top:60px}#off{display:none}#result{white-space:pre;display:none}
 </style></head><body>
 <div><a id="watch" href="/watch?type=movie&id=1">Watch</a><a id="details" href="/detail?id=1">Details</a></div>
 <div id="row"><button id="one">Film 1</button><button id="two">Film 2</button></div>
@@ -10,9 +10,11 @@ body{margin:0;padding:30px;font:16px sans-serif}a,button{display:inline-block;wi
 <pre id="result">RUNNING</pre>
 <script src="../app/src/main/assets/tv-navigation.js"></script>
 <script>
+window.addEventListener('error',e=>{document.querySelector('#result').textContent+='\nFAIL '+e.message+' at '+e.lineno;});
+window.addEventListener('unhandledrejection',e=>{document.querySelector('#result').textContent+='\nFAIL '+e.reason?.stack;});
 setTimeout(function(){
  var results=[];
- function check(label,condition){results.push((condition?'PASS ':'FAIL ')+label);}
+ function check(label,condition){results.push((condition?'PASS ':'FAIL ')+label);document.querySelector('#result').textContent=results.join('\n');}
  function focused(){return document.querySelector('[data-rive-focus="true"]')?.id;}
  RiveTV.first();check('first visible control',focused()==='watch');
  RiveTV.move('right');check('right chooses adjacent link',focused()==='details');
@@ -201,6 +203,56 @@ setTimeout(function(){
   fixture.appendChild(document.createTextNode('Results updated'));await new Promise(r=>setTimeout(r,250));
   check('results update cannot reopen the completed editor',focused()==='search-result');
   RiveTV.search('native edit',true);check('native edits update the query without stealing focus',document.querySelector('#editing').value==='native edit'&&document.activeElement.id==='search-result');
+  var mirrored=[];window.RiveTVStorage={postMessage:s=>mirrored.push(JSON.parse(s))};
+  localStorage.setItem('RiveStreamWatchlist',JSON.stringify({movie:['42'],tv:['7']}));
+  check('favorites are mirrored into Android storage',mirrored.some(x=>x.key==='RiveStreamWatchlist'&&JSON.parse(x.value).movie[0]==='42'));
+  localStorage.removeItem('RiveStreamWatchlist');
+  check('explicit favorite removal also clears Android backup',mirrored.some(x=>x.key==='RiveStreamWatchlist'&&x.value===null));
+  localStorage.setItem('rive_trakt_credentials','private');
+  check('credential storage is excluded from viewing backup',!mirrored.some(x=>x.key==='rive_trakt_credentials'));
+  localStorage.setItem('RiveTVProgress',JSON.stringify({'tv:42:1:2':{time:123,duration:1200,updated:Date.now(),complete:false}}));
+  history.replaceState(null,'','/watch?type=tv&id=42&season=1&episode=2');
+  fixture.innerHTML='<div class="style_watchBarContainer__fixture"><button id="quick">Quick Menu</button></div><iframe id="provider" style="width:640px;height:360px"></iframe>';
+  (0,eval)(await(await fetch('../app/src/main/assets/tv-playback.js')).text());
+  var provider=document.querySelector('#provider');
+  var probe;window.addEventListener('message',e=>{if(e.source===provider.contentWindow&&e.data.fixture==='probe')probe=e.data;});
+  provider.setAttribute('sandbox','allow-scripts');
+  var providerLoaded=new Promise(resolve=>provider.onload=resolve);
+  provider.src=location.origin+'/tests/playback-frame.html';
+  await providerLoaded;
+  await new Promise(r=>setTimeout(r,2200));RiveTV.first();
+  check('Watch opens with no automatic Quick Menu highlight',!focused()&&getComputedStyle(document.querySelector('#quick')).visibility==='hidden');
+  provider.contentWindow.postMessage({fixture:'probe'},'*');await new Promise(r=>setTimeout(r,100));
+  check('cross origin playback starts and resumes without extra OK presses',probe&&probe.time===123&&!probe.paused);
+  check('hidden player center targets playback',RiveTV.target().playback===true);
+  RiveTV.activate();await new Promise(r=>setTimeout(r,1200));provider.contentWindow.postMessage({fixture:'probe'},'*');await new Promise(r=>setTimeout(r,100));
+  check('autostart respects a deliberate pause',probe&&probe.paused);
+  RiveTV.activate();await new Promise(r=>setTimeout(r,100));provider.contentWindow.postMessage({fixture:'probe'},'*');await new Promise(r=>setTimeout(r,100));
+  check('second center press resumes cross origin playback',probe&&!probe.paused&&probe.time===123);
+  RiveTV.move('down');
+  check('Down reveals controls without an intro button',focused()==='quick'&&!document.querySelector('#rive-skip-intro')&&RiveTVPlayback.hidden()===false);
+  window.quickClicks=0;document.querySelector('#quick').onclick=()=>window.quickClicks++;
+  RiveTV.activate();check('center still activates a selected menu button',window.quickClicks===1);
+  provider.focus();check('visible focused player center targets playback',RiveTV.target().playback===true);
+  RiveTV.activate();await new Promise(r=>setTimeout(r,1200));provider.contentWindow.postMessage({fixture:'probe'},'*');await new Promise(r=>setTimeout(r,100));
+  check('center pauses focused player without seeking',probe&&probe.paused&&probe.time===123);
+  RiveTV.activate();await new Promise(r=>setTimeout(r,100));provider.contentWindow.postMessage({fixture:'probe'},'*');await new Promise(r=>setTimeout(r,100));
+  check('center resumes focused player',probe&&!probe.paused&&probe.time===123);
+  provider.contentWindow.postMessage({fixture:'time',time:330},'*');await new Promise(r=>setTimeout(r,100));
+  check('provider progress is saved per episode',JSON.parse(localStorage.getItem('RiveTVProgress'))['tv:42:1:2'].time===330);
+  check('embedded progress updates site episode badges',JSON.parse(localStorage.getItem('RiveStreamWatchTracker')).tv.find(x=>x.id==='42').data.find(x=>x.episode==='2').watchTime===330);
+  check('viewing progress reaches the Android backup',mirrored.some(x=>x.key==='RiveTVProgress'&&JSON.parse(x.value)['tv:42:1:2']?.time===330));
+  history.replaceState(null,'','/watch?type=tv&id=42&season=1&episode=3');
+  RiveTV.first();await new Promise(r=>setTimeout(r,2200));
+  check('next episode starts with its own hidden controls',RiveTVPlayback.hidden()&&!focused());
+  check('Back reveals controls once before navigating away',RiveTV.revealPlayback()&&!RiveTV.revealPlayback());
+  provider.contentWindow.postMessage({fixture:'time',time:80},'*');await new Promise(r=>setTimeout(r,100));
+  var savedEpisodes=JSON.parse(localStorage.getItem('RiveTVProgress'));
+  check('saving another episode preserves the previous episode',savedEpisodes['tv:42:1:2'].time===330&&savedEpisodes['tv:42:1:3'].time===80);
+  provider.contentWindow.postMessage({fixture:'time',time:1190},'*');await new Promise(r=>setTimeout(r,100));
+  check('completed episode restarts from zero',JSON.parse(localStorage.getItem('RiveTVProgress'))['tv:42:1:3'].complete===true&&JSON.parse(localStorage.getItem('RiveTVProgress'))['tv:42:1:3'].time===0);
+  history.replaceState(null,'','/watch?type=movie&id=99');fixture.appendChild(document.createTextNode('movie'));await new Promise(r=>setTimeout(r,250));RiveTV.first();RiveTV.revealPlayback();
+  check('movies do not show a series intro button',!document.querySelector('#rive-skip-intro'));
   document.querySelector('#result').textContent=results.join('\n');
   document.title=results.some(x=>x.startsWith('FAIL'))?'FAILED':'PASSED';
  },250);

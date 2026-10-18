@@ -1,8 +1,22 @@
 # Rivestream TV — rozwój
 
+## Auto next
+
+W Ustawieniach, pod wyborem motywu, jest przełącznik **Auto next — następny odcinek** (domyślnie wyłączony) oraz czas pokazania przycisku: po zakończeniu albo 30–180 sekund przed końcem. Domyślnie przycisk pojawia się 90 sekund przed końcem, maksymalnie na ostatnie 10% odcinka. To przybliżenie outro na podstawie czasu wideo, nie rozpoznawanie napisów końcowych.
+
+Przycisk **Następny odcinek** działa także przy wyłączonym auto next. Strzałka w dół podczas oglądania pokazuje sterowanie i ustawia fokus na tym przycisku. Po włączeniu auto next odliczanie trwa 15 sekund; można je anulować dla bieżącego odcinka. Pauza, buforowanie i przejście aplikacji w tło zatrzymują odliczanie. Timer snu blokuje przejście. Ustawienia `RiveTVPlaybackSettings` są zachowywane w prywatnej kopii danych Androida.
+
+Przejście korzysta z dostępności i akcji następnego odcinka w Quick Menu strony, także na granicy sezonów; wymaga danych czasu od odtwarzacza Direct lub ramki dostawcy. Adapter odczytuje aktualne propsy komponentu React, gdy przyciski Quick Menu nie są zamontowane. Przy braku dostępnej akcji nie pokazuje przycisku ani nie zgaduje numeru odcinka. Zmiana struktury strony może wymagać aktualizacji adaptera.
+
+Regresje: `scripts/test-playback.sh` — 33 kontroli preferencji, odliczania, pauzy, buforowania, anulowania, pilota, timera snu, końca serialu, aktualnego drzewa React i odrzucania spóźnionych komunikatów ramek.
+
 Lokalna aplikacja APK do obsługi **https://www.rivestream.app/** pilotem telewizora. Ma menu TV, zaznaczanie kafelków strzałkami, wyszukiwanie klawiaturą ekranową z jej systemowym dyktowaniem, listy wyboru dostosowane do pilota, pełny ekran odtwarzacza oraz przełączany kursor do osadzonych odtwarzaczy. Podczas oglądania menu boczne chowa się automatycznie. Historia, ustawienia strony i sesja są zapisywane w prywatnym WebView aplikacji.
 
 ## Wersja 1.5.4 — płynność i wygląd jak w aplikacjach TV
+
+Zmiany robocze odtwarzacza TV: osobny czas wznowienia dla filmu i każdego odcinka, także w zagnieżdżonych odtwarzaczach Embed. Ulubione, historia, postęp i ustawienia mają dodatkową kopię w prywatnych preferencjach Androida; aktualizacja tego samego pakietu z zachowaniem podpisu zachowuje dane. Odtwarzacz startuje automatycznie przez znane kontrolki dostawców i nie wznawia sam celowej pauzy. Interfejs początkowo jest schowany: Wstecz lub Dół odsłania kontrolki, kolejne Wstecz wraca; OK przełącza pauzę, Lewo/Prawo przewija o 10 s. Pomijanie intro zostało usunięte. „Następny odcinek” pojawia się jako sam przycisk z automatycznym zaznaczeniem dla pilota; odliczanie auto next jest na przycisku. OK na schowanym lub zaznaczonym odtwarzaczu przełącza pauzę i odtwarzanie, także na pełnym ekranie; przy widocznych kontrolkach OK nadal wybiera zaznaczony przycisk. Dostępność wideo nadal zależy od serwera i WebView. Kopia nie obejmuje tokenów zewnętrznych kont. Odinstalowanie lub wyczyszczenie danych aplikacji usuwa zapis.
+
+Test zapisu Androida: po zbudowaniu i zainstalowaniu APK debug i androidTest uruchom `adb -s emulator-5580 shell am instrument -w -e viewingTests true app.rivestream.tv.test/app.rivestream.tv.InputRegressionTest`. Testy nawigacji obejmują również odtwarzacz w ramce o obcym pochodzeniu: start, pauzę i wznowienie przyciskiem OK, brak pomijania intro, zapis odcinków i zachowanie fokusu.
 
 Strona trzymała klasę `skeleton` na wczytanych obrazkach, więc animacje ładowania działały bez końca i przerysowywały ekran co klatkę. Na Xiaomi Mi TV bezczynna strona główna zajmowała ~186% CPU; teraz ~3%, a mediana klatki przy przewijaniu spadła z 93 ms do 15 ms. Tło banera pobiera się w rozmiarze w1280 zamiast 4K, plakaty w w342 zamiast rozciąganych w185. Baner nie zmienia już tytułu co 15 s pod zaznaczonym przyciskiem Watch.
 
