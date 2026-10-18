@@ -1,0 +1,39 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'app.rivestream.tv'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+    buildFeatures { buildConfig true }
+    defaultConfig {
+        applicationId 'app.rivestream.tv'
+        minSdk 28
+        targetSdk 35
+        versionCode = (project.findProperty("riveVersionCode") ?: "10504").toInteger()
+        versionName = (project.findProperty("riveVersionName") ?: "1.5.4").toString()
+        testInstrumentationRunner 'app.rivestream.tv.InputRegressionTest'
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Local sideload builds use a persistent local key, configured in scripts/build.sh.
+            signingConfig signingConfigs.debug
+        }
+    }
+    signingConfigs {
+        debug {
+            storeFile file(System.getenv('RIVE_KEYSTORE') ?: "${System.getProperty('user.home')}/.android/rivestream-tv.keystore")
+            storePassword 'android'
+            keyAlias 'rivestream'
+            keyPassword 'android'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>TV navigation tests</title>
+<link rel="stylesheet" href="../app/src/main/assets/tv-theme.css">
+<style>
+body{margin:0;padding:30px;font:16px sans-serif}a,button{display:inline-block;width:140px;height:50px;margin:15px}#row{margin-top:60px}#off{display:none}#result{white-space:pre}
+</style></head><body>
+<div><a id="watch" href="/watch?type=movie&id=1">Watch</a><a id="details" href="/detail?id=1">Details</a></div>
+<div id="row"><button id="one">Film 1</button><button id="two">Film 2</button></div>
+<button id="off">Hidden</button><div tabindex="-1" style="position:absolute;left:200px;top:32px">Not a control</div>
+<pre id="result">RUNNING</pre>
+<script src="../app/src/main/assets/tv-navigation.js"></script>
+<script>
+setTimeout(function(){
+ var results=[];
+ function check(label,condition){results.push((condition?'PASS ':'FAIL ')+label);}
+ function focused(){return document.querySelector('[data-rive-focus="true"]')?.id;}
+ RiveTV.first();check('first visible control',focused()==='watch');
+ RiveTV.move('right');check('right chooses adjacent link',focused()==='details');
+ RiveTV.move('left');check('left returns to link',focused()==='watch');
+ check('left edge enters native menu',RiveTV.move('left')==='rail');
+ RiveTV.move('down');check('down selects next row',focused()==='one');
+ RiveTV.move('right');check('right stays in row',focused()==='two');
+ var clicked=false;document.querySelector('#two').onclick=function(){clicked=true;};
+ RiveTV.activate();check('OK activates selected element',clicked);
+ document.querySelector('#two').remove();
+ setTimeout(async function(){
+  RiveTV.first();check('removed control gets a replacement',!!document.querySelector('[data-rive-focus]'));
+  check('hidden and negative tabindex skipped',focused()!=='off'&&focused()!==undefined);
+  var retained=focused();RiveTV.suspend();
+  check('native menu removes web highlight',!document.querySelector('[data-rive-focus]'));
+  RiveTV.resume();check('return restores previous focus',focused()===retained);
+  RiveTV.move('right');check('only one focus marker exists',document.querySelectorAll('[data-rive-focus]').length===1);
+  var hidden=document.createElement('div');hidden.style.opacity='0';hidden.innerHTML='<button id="transparent">Unavailable</button>';document.body.appendChild(hidden);
+  var nested=document.createElement('div');nested.setAttribute('role','button');nested.id='outer';nested.style.cssText='position:absolute;top:350px;left:80px;width:140px;height:50px';nested.innerHTML='<span role="button" id="inner">Nested label</span>';document.body.appendChild(nested);
+  await new Promise(r=>setTimeout(r,250));RiveTV.first();
+  check('transparent ancestor excludes its controls',!document.querySelector('#transparent').hasAttribute('tabindex'));
+  check('nested controls do not create duplicate targets',!document.querySelector('#inner').hasAttribute('tabindex'));
+  var modal=document.createElement('div');modal.setAttribute('role','dialog');modal.style.cssText='position:fixed;inset:20px;background:#222;z-index:100';modal.innerHTML='<button id="cancel">Cancel</button><button id="confirm">Confirm</button>';document.body.appendChild(modal);
+  var beforeModal=focused();await new Promise(r=>setTimeout(r,250));
+  check('opening modal moves focus inside',focused()==='cancel');
+  check('modal left edge does not escape to native rail',RiveTV.move('left')==='ok');
+  RiveTV.move('right');check('modal navigation stays inside',focused()==='confirm');
+  modal.remove();await new Promise(r=>setTimeout(r,250));RiveTV.first();
+  check('closing modal restores prior selection',focused()===beforeModal);
+  var focusStyle=getComputedStyle(document.querySelector('[data-rive-focus]'));
+  check('focus uses a white two-pixel ring ('+focusStyle.outlineColor+', '+focusStyle.outlineWidth+')',focusStyle.outlineColor==='rgb(255, 255, 255)'&&Math.abs(parseFloat(focusStyle.outlineWidth)-2)<.2);
+  var select=document.createElement('select');select.innerHTML='<option value="one">Server 1</option><option value="two">Server 2</option><option disabled>Unavailable</option>';document.body.appendChild(select);
+  var range=document.createElement('input');range.type='range';range.min='0';range.max='10';range.step='2';range.value='4';document.body.appendChild(range);
+  var input=document.createElement('input');input.type='search';input.className='Search_searchInput__fixture';document.body.appendChild(input);
+  var frame=document.createElement('iframe');frame.src='about:blank';document.body.appendChild(frame);
+  await new Promise(r=>setTimeout(r,250));RiveTV.first();select.focus();
+  var selectTarget=RiveTV.target();
+  check('select exposes TV options and current selection',selectTarget.select&&selectTarget.options.length===3&&selectTarget.options[0].selected);
+  check('disabled select options are reported',selectTarget.options[2].disabled);
+  var changed=0;select.addEventListener('change',()=>changed++);RiveTV.choose(1);
+  check('TV select changes value and dispatches change',select.value==='two'&&changed===1);
+  check('disabled option cannot be chosen',!RiveTV.choose(2)&&select.value==='two');
+  range.focus();RiveTV.move('right');check('range adjusts using right arrow',range.value==='6');
+  RiveTV.move('left');check('range adjusts using left arrow',range.value==='4');
+  check('programmatic query cannot edit another page',!RiveTV.search('Sintel')&&input.value==='');
+  history.replaceState(null,'','/search');
+  await new Promise(r=>setTimeout(r,250));RiveTV.first();
+  var edits=0;input.addEventListener('input',()=>edits++);
+  check('programmatic query sends input to search',RiveTV.search('Sintel')&&input.value==='Sintel'&&edits===1);
+  check('search right arrow has no duplicate microphone target',RiveTV.move('right')!=='voice');
+  frame.focus();check('iframe is a player activation target',RiveTV.target().player);
+  RiveTV.enterPlayer();check('engaged player receives native arrows',RiveTV.move('down')==='native');
+  check('Back can release player to site controls',RiveTV.releasePlayer()&&document.querySelector('[data-rive-focus]')!==frame);
+  check('player release only consumes Back once',!RiveTV.releasePlayer());
+  var trigger=document.createElement('button');trigger.id='custom-select';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');trigger.textContent='Server';document.body.appendChild(trigger);
+  var popup,pickedOption;
+  trigger.onclick=function(){
+    if(popup?.isConnected){var closing=popup;closing.style.opacity='0';setTimeout(()=>closing.remove(),80);trigger.setAttribute('aria-expanded','false');return;}
+    trigger.setAttribute('aria-expanded','true');popup=document.createElement('div');popup.className='style_desktopPopover__fixture';popup.style.cssText='position:fixed;top:20px;left:300px;width:220px;height:180px;background:#222;z-index:999';
+    popup.innerHTML='<div id="option-first" role="option" aria-selected="true" style="height:44px">Server 1</div><div id="option-second" role="option" style="height:44px">Server 2</div><div role="option" aria-disabled="true" style="height:44px">Unavailable</div>';
+    popup.querySelector('#option-second').onclick=function(){pickedOption='two';popup.remove();trigger.setAttribute('aria-expanded','false');};document.body.appendChild(popup);
+  };
+  await new Promise(r=>setTimeout(r,250));RiveTV.first();trigger.focus();
+  check('custom select requests the native TV list',RiveTV.activate()==='dropdown');
+  check('website list is suppressed before the first paint',document.documentElement.hasAttribute('data-rive-native-select'));
+  await new Promise(r=>setTimeout(r,250));var dropdown=RiveTV.dropdown();
+  check('custom select exposes selected and disabled options',dropdown.custom&&dropdown.options[0].selected&&dropdown.options[2].disabled);
+  check('backing list stays invisible behind native dialog',getComputedStyle(popup).visibility==='hidden');
+  RiveTV.move('down');check('hidden web options cannot receive duplicate focus',focused()!=='option-second'&&focused()!=='option-first');
+  RiveTV.choose(1);check('custom select invokes site click handler',pickedOption==='two');
+  await new Promise(r=>setTimeout(r,250));
+  check('custom select automatically restores trigger focus',focused()==='custom-select');
+  check('selection releases hidden list state',!document.documentElement.hasAttribute('data-rive-native-select'));
+  RiveTV.activate();await new Promise(r=>setTimeout(r,250));
+  check('Back closes custom select without leaving page',RiveTV.closeDropdown()&&location.pathname==='/search');
+  check('closing animation cannot flash the website list',document.documentElement.hasAttribute('data-rive-native-select')&&getComputedStyle(popup).visibility==='hidden');
+  await new Promise(r=>setTimeout(r,150));
+  check('cancel releases hidden state after closing animation',!document.documentElement.hasAttribute('data-rive-native-select'));
+  var bootstrap=await (await fetch('../app/src/main/assets/tv-bootstrap.js')).text();
+  localStorage.removeItem('RiveStreamSettings');eval(bootstrap);
+  check('first playback always has a settings object',localStorage.getItem('RiveStreamSettings')==='{}');
+  localStorage.setItem('RiveStreamSettings','{"syncProgress":"false","MediaPlayer":"custom"}');eval(bootstrap);
+  check('bootstrap preserves existing preferences',JSON.parse(localStorage.getItem('RiveStreamSettings')).MediaPlayer==='custom');
+  localStorage.setItem('RiveStreamSettings','null');eval(bootstrap);
+  check('null preferences recover with a backup',localStorage.getItem('RiveStreamSettings')==='{}'&&localStorage.getItem('RiveTVSettingsBackup')==='null');
+  localStorage.setItem('RiveStreamSettings','broken');eval(bootstrap);
+  check('malformed preferences recover before site code',localStorage.getItem('RiveStreamSettings')==='{}');
+  check('browser scroll restoration is disabled',history.scrollRestoration==='manual');
+  Array.from(document.body.children).forEach(e=>{if(e.id!=='result'&&e.tagName!=='SCRIPT')e.remove();});
+  history.replaceState(null,'','/detail?type=tv&id=1');
+  var fixture=document.createElement('div');fixture.innerHTML='<a id="series-watch" href="/watch?type=tv&id=1">Watch series</a><div class="style_MetaDetails__test" style="margin-top:120px"><div class="style_category__test"><p id="episodes" class="style_inactive__test" style="display:inline-block">Episodes</p><p id="overview" class="style_active__test" style="display:inline-block">Overview</p></div><div style="height:1200px"></div></div>';document.body.appendChild(fixture);
+  await new Promise(r=>setTimeout(r,250));
+  check('route change starts at top without scrolling to a late control',scrollY===0&&focused()==='series-watch');
+  history.replaceState(null,'','/detail?type=tv&id=2');document.querySelector('#series-watch').href='/watch?type=tv&id=undefined';
+  await new Promise(r=>setTimeout(r,250));
+  check('missing banner id uses a provisional tab focus',focused()==='episodes');
+  document.querySelector('#series-watch').href='/watch?type=tv&id=2';
+  await new Promise(r=>setTimeout(r,250));
+  check('late banner takes initial focus without scrolling',focused()==='series-watch'&&scrollY===0);
+  check('detail text tabs become remote controls',document.querySelector('#episodes').getAttribute('role')==='tab'&&document.querySelector('#overview').getAttribute('aria-selected')==='true');
+  RiveTV.move('down');check('down from series banner reaches episodes',focused()==='episodes');
+  RiveTV.move('right');check('right moves between detail tabs',focused()==='overview');
+  var tabClicked=false;document.querySelector('#episodes').onclick=()=>tabClicked=true;
+  RiveTV.move('left');RiveTV.activate();check('OK activates episodes tab',tabClicked);
+  var season=document.createElement('button');season.id='season';season.setAttribute('aria-haspopup','listbox');season.setAttribute('aria-expanded','false');season.textContent='Saiyan Saga (39)';season.style.cssText='display:block;width:calc(100% - 30px);height:50px;margin:15px';
+  var episode=document.createElement('a');episode.id='first-episode';episode.href='/watch?type=tv&id=1&season=1&episode=1';episode.textContent='Episode 1';
+  var meta=fixture.querySelector('[class*="MetaDetails__"]');meta.insertBefore(season,meta.lastElementChild);meta.insertBefore(episode,meta.lastElementChild);
+  season.onclick=function(){
+    season.setAttribute('aria-expanded','true');var choices=document.createElement('div');choices.className='style_mobileSheet__season';choices.style.cssText='position:fixed;inset:40px;background:#222;z-index:50';choices.innerHTML='<div role="option" aria-selected="true" style="height:50px">Saiyan Saga (39)</div><div role="option" style="height:50px">Frieza Saga (35)</div>';
+    choices.children[1].onclick=function(){season.textContent='Frieza Saga (35)';season.setAttribute('aria-expanded','false');episode.href='/watch?type=tv&id=1&season=2&episode=1';choices.remove();};document.body.appendChild(choices);
+  };
+  await new Promise(r=>setTimeout(r,250));RiveTV.move('down');
+  check('Down from Episodes reaches wide season selector before episode links',focused()==='season');
+  check('OK on season requests native remote list',RiveTV.activate()==='dropdown');
+  await new Promise(r=>setTimeout(r,250));
+  check('season list exposes both saga names',RiveTV.dropdown()?.options[1].label==='Frieza Saga (35)');
+  RiveTV.choose(1);await new Promise(r=>setTimeout(r,250));
+  check('choosing a season invokes the site update',season.textContent==='Frieza Saga (35)'&&episode.href.includes('season=2'));
+  check('season list closes and restores selector focus',focused()==='season'&&!document.querySelector('[class*="mobileSheet__"]'));
+  RiveTV.move('down');check('Down from season reaches episode controls',focused()==='first-episode');
+  window.scrollTo({top:0,behavior:'auto'});document.querySelector('#overview').scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  check('site tab recentering never hides the page header',scrollY===0);
+  check('detail readiness waits for a usable banner',RiveTV.pageState()==='ready');
+  document.querySelector('#series-watch').href='/watch?type=tv&id=undefined';
+  check('loading remains while title id is unavailable',RiveTV.pageState()==='loading');
+  fixture.innerHTML='<h2>Application error: a client-side exception has occurred</h2>';
+  check('client error is exposed for native recovery',RiveTV.pageState()==='error');
+  fixture.querySelector('h2').hidden=true;
+  check('hidden stale error never covers the page',RiveTV.pageState()!=='error');
+  fixture.innerHTML='<div>Application error: a client-side exception has occurred</div>';
+  check('route announcements do not count as a crashed page',RiveTV.pageState()!=='error');
+  fixture.innerHTML='<h2>Application error: a client-side exception has occurred</h2><iframe class="Watch_iframe__test" allowfullscreen style="width:600px;height:300px" src="about:blank"></iframe>';
+  check('visible embed is never hidden by the native error overlay',RiveTV.pageState()!=='error');
+  check('embed surface has full viewport height',fixture.querySelector('iframe').getBoundingClientRect().height===innerHeight);
+  fixture.innerHTML='<h2>Application error: a client-side exception has occurred</h2><iframe style="width:1px;height:1px" src="about:blank"></iframe>';
+  check('auth iframe cannot hide a real page crash',RiveTV.pageState()==='error');
+  var compat=await (await fetch('../app/src/main/assets/tv-compat.js')).text();
+  var nativeGroupBy=Object.getOwnPropertyDescriptor(Object,'groupBy');delete Object.groupBy;eval(compat);
+  var grouped=Object.groupBy([{server:'one',id:1},{server:'two',id:2},{server:'one',id:3}],e=>e.server);
+  check('old engine groups provider sources correctly',grouped.one.length===2&&grouped.two[0].id===2);
+  check('groupBy safely handles prototype keys',Object.getPrototypeOf(Object.groupBy(['__proto__'],x=>x))===null&&Object.groupBy(['__proto__'],x=>x).__proto__[0]==='__proto__');
+  var symbol=Symbol('server');check('groupBy supports symbol source keys',Object.groupBy([1,2],()=>symbol)[symbol].length===2);
+  var indices=[];Object.groupBy(new Set(['a','b']),(_,i)=>{indices.push(i);return i});
+  check('groupBy accepts iterables and supplies callback indices',indices.join(',')==='0,1');
+  var originalPolyfill=Object.groupBy;eval(compat);check('compatibility script preserves an existing implementation',Object.groupBy===originalPolyfill);
+  var invalid=false;try{Object.groupBy([],null)}catch(e){invalid=e instanceof TypeError}check('groupBy rejects a non-callable callback',invalid);
+  if(nativeGroupBy)Object.defineProperty(Object,'groupBy',nativeGroupBy);else delete Object.groupBy;
+  var originalMetadata=window.MediaMetadata, originalSession=Object.getOwnPropertyDescriptor(navigator,'mediaSession');
+  delete window.MediaMetadata;Object.defineProperty(navigator,'mediaSession',{configurable:true,value:undefined});
+  eval(compat);
+  check('WebView without Media Session can initialize Direct playback',typeof MediaMetadata==='function'&&!!navigator.mediaSession);
+  navigator.mediaSession.metadata=new MediaMetadata({title:'Spider-Man',artist:'Rive',artwork:[{src:'poster.png'}]});
+  check('TV media fallback retains the player metadata',navigator.mediaSession.metadata.title==='Spider-Man'&&navigator.mediaSession.metadata.artwork[0].src==='poster.png');
+  var mediaCalls=true;try{navigator.mediaSession.setActionHandler('play',()=>{});navigator.mediaSession.setPositionState({duration:60,position:5});}catch(e){mediaCalls=false}
+  check('optional OS media actions do not crash TV playback',mediaCalls);
+  var retainedMetadata=MediaMetadata,retainedSession=navigator.mediaSession;eval(compat);
+  check('compatibility preserves existing media implementations',MediaMetadata===retainedMetadata&&navigator.mediaSession===retainedSession);
+  window.MediaMetadata=originalMetadata;if(originalSession)Object.defineProperty(navigator,'mediaSession',originalSession);else delete navigator.mediaSession;
+  fixture.innerHTML='<div class="style_EpisodeList__test">'+Array.from({length:12},(_,i)=>'<div class="style_episode__test" style="position:relative;height:130px"><a id="poster-'+i+'" href="/watch?type=tv&id=1&episode='+i+'" style="position:absolute;top:0;left:0;margin:0;height:45px">Poster '+i+'</a><a id="episode-watch-'+i+'" href="/watch?type=tv&id=1&episode='+i+'" style="position:absolute;top:55px;left:0;margin:0;height:40px">Watch '+i+'</a></div>').join('')+'</div>';
+  await new Promise(r=>setTimeout(r,250));RiveTV.resume();document.querySelector('#poster-0').focus();
+  var visited=[];for(var repeat=0;repeat<8;repeat++){RiveTV.move('down',true);visited.push(focused());}
+  check('held Down advances one episode per step',visited.join(',')===Array.from({length:8},(_,i)=>'poster-'+(i+1)).join(','));
+  check('held navigation disables restarting scroll animations',getComputedStyle(document.documentElement).scrollBehavior==='auto');
+  RiveTV.stopMove();var releasedFocus=focused();await new Promise(r=>setTimeout(r,450));var releasedScroll=scrollY;await new Promise(r=>setTimeout(r,250));
+  check('released navigation has no delayed focus or scroll steps',focused()===releasedFocus&&scrollY===releasedScroll);
+  check('release restores ordinary scrolling',!document.documentElement.hasAttribute('data-rive-repeat'));
+  fixture.innerHTML='<div id="page-scroller" style="position:fixed;inset:0;overflow-y:auto;z-index:20;background:#111">'+Array.from({length:8},(_,i)=>'<a id="row-'+i+'" href="/detail?type=movie&id='+i+'" style="display:block;height:'+Math.round(innerHeight*.6)+'px;margin:0 0 20px 100px;width:200px">Row '+i+'</a>').join('')+'</div>';
+  var pageScroller=document.querySelector('#page-scroller');window.scrollTo({top:0,behavior:'auto'});
+  var smoothIntoView=Element.prototype.scrollIntoView,smoothTo=Element.prototype.scrollTo;
+  Element.prototype.scrollIntoView=function(o){return smoothIntoView.call(this,Object.assign({},o,{behavior:'auto'}));};
+  Element.prototype.scrollTo=function(o){return smoothTo.call(this,Object.assign({},o,{behavior:'auto'}));};
+  await new Promise(r=>setTimeout(r,250));RiveTV.resume();document.querySelector('#row-0').focus();
+  for(var step=0;step<4;step++){RiveTV.move('down',false);await new Promise(r=>setTimeout(r,900));}
+  var rowRect=document.querySelector('#row-4').getBoundingClientRect();
+  check('single Down scrolls an inner page container to the focused row',focused()==='row-4'&&pageScroller.scrollTop>0&&rowRect.top>=0&&rowRect.bottom<=innerHeight);
+  for(var step=0;step<4;step++){RiveTV.move('up',false);await new Promise(r=>setTimeout(r,900));}
+  check('single Up returns an inner page container to its first row',focused()==='row-0'&&pageScroller.scrollTop===0&&scrollY===0);
+  Element.prototype.scrollIntoView=smoothIntoView;Element.prototype.scrollTo=smoothTo;
+  history.replaceState(null,'','/search');
+  fixture.innerHTML='<input id="editing" type="search"><button id="search-result">Search result</button>';
+  window.scrollTo({top:0,behavior:'auto'});await new Promise(r=>setTimeout(r,250));RiveTV.resume();document.querySelector('#editing').focus();
+  var editorTarget=RiveTV.target();check('search exports text and geometry for the Android editor',editorTarget.search&&editorTarget.text===''&&editorTarget.width>0&&editorTarget.height>0);
+  var committed=0;document.querySelector('#editing').addEventListener('change',()=>committed++);RiveTV.finishEditing();
+  check('Done commits editing before leaving the input',committed===1);
+  check('Done moves focus out of the search field',document.activeElement.id==='search-result'&&focused()==='search-result');
+  fixture.appendChild(document.createTextNode('Results updated'));await new Promise(r=>setTimeout(r,250));
+  check('results update cannot reopen the completed editor',focused()==='search-result');
+  RiveTV.search('native edit',true);check('native edits update the query without stealing focus',document.querySelector('#editing').value==='native edit'&&document.activeElement.id==='search-result');
+  document.querySelector('#result').textContent=results.join('\n');
+  document.title=results.some(x=>x.startsWith('FAIL'))?'FAILED':'PASSED';
+ },250);
+},500);
+</script></body></html>

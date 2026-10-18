@@ -1,0 +1,16 @@
+# Run: phrocs (or double-click Uruchom-TV.command).
+procs:
+  rivestream-tv:
+    shell: ./scripts/run-tv.sh
+    autostart: true
+    ready_pattern: "RIVESTREAM TV READY"
+    stop: SIGTERM
+  build-apk:
+    shell: ./scripts/build.sh release
+    autostart: false
+  android-logs:
+    shell: bash -c 'source scripts/env.sh; exec adb -s "$RIVE_SERIAL" logcat -v time chromium:E AndroidRuntime:E "*:S"'
+    autostart: false
+  android-lint:
+    shell: bash -c 'source scripts/env.sh; exec ./gradlew --no-daemon --console=plain :app:lint'
+    autostart: false
