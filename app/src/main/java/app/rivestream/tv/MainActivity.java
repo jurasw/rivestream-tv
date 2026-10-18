@@ -161,7 +161,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 (view,message,origin,mainFrame,reply)->{if(mainFrame){viewingStore.accept(message.getData());refreshStorageBootstrap();}});
         }
         bootstrapScript=readAsset("tv-bootstrap.js");
-        compatibilityScript=readAsset("tv-compat.js")+"\n"+readAsset("tv-playback.js");
+        compatibilityScript=readAsset("tv-compat.js")+"\n"+readAsset("tv-playback.js")+"\n"+readAsset("tv-ads.js");
         if(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)){
             documentStartSupported=true;
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));
@@ -478,7 +478,16 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         web.evaluateJavascript("localStorage.setItem('RiveStreamWatchMode',"+JSONObject.quote(mode)+");localStorage.setItem('RiveStreamEmbedMode','"+("embed".equals(mode)?"true":"false")+"');document.querySelectorAll('video,audio').forEach(function(v){v.pause();});",result->{if(web!=null){web.reload();web.requestFocus();}});
     }
     private void showPlaybackMenu(){
-        showTvDialog("Odtwarzanie","Wybierz tryb lub źródło",new String[]{"Direct","Embed","Serwery","Opcje aplikacji"},new Runnable[]{()->setPlaybackMode("direct"),()->setPlaybackMode("embed"),()->{if(pageFailed){setPlaybackMode("embed");}else web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);else showNotice("Wybór serwera pojawi się po wczytaniu odtwarzacza.");});},()->showAppMenu()},true);
+        showTvDialog("Odtwarzanie","Wybierz tryb lub źródło",new String[]{"Direct","Embed","Serwery","Zamknij reklamę","Opcje aplikacji"},new Runnable[]{()->setPlaybackMode("direct"),()->setPlaybackMode("embed"),()->{if(pageFailed){setPlaybackMode("embed");}else web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);else showNotice("Wybór serwera pojawi się po wczytaniu odtwarzacza.");});},this::dismissAds,()->showAppMenu()},true);
+    }
+    private void dismissAds(){
+        if(web==null)return;
+        web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.dismiss() : -1",before->handler.postDelayed(()->{
+            if(web!=null)web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.removed() : -1",after->{
+                web.requestFocus();
+                showNotice(!before.equals(after)?"Zamknięto wyskakujące okno.":"Nie znaleziono okna do zamknięcia. Włącz kursor (przytrzymaj OK) i kliknij X.");
+            });
+        },600));
     }
     private void showMenu(){
         if(web!=null && web.getUrl()!=null && "/watch".equals(Uri.parse(web.getUrl()).getPath())){showPlaybackMenu();return;}
