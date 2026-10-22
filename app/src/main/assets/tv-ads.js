@@ -158,7 +158,10 @@
     dismiss:function () {var before = removed;dismiss();return before;},
     removed:function () {return removed;},
     blocked:function () {return blocked;},
-    captcha:function () {return captcha && Date.now() - captcha.at < 3500 ? JSON.stringify(captcha) : null;}
+    captcha:function (probe) {
+      if (!probe && window.RiveTVServers && window.RiveTVServers.searching()) return null;
+      return captcha && Date.now() - captcha.at < 3500 ? JSON.stringify(captcha) : null;
+    }
   };
   setInterval(scan,1000);
 })();

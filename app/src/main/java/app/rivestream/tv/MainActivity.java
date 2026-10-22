@@ -190,7 +190,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));
             refreshStorageBootstrap();
         }
-        navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js")+"\n"+readAsset("tv-shell.js");
+        navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js")+"\n"+readAsset("tv-shell.js")+"\n"+readAsset("tv-servers.js");
         web.setOnFocusChangeListener((v,focus)->{if(focus)setRailExpanded(false);else stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
         cursor=new CursorView();
         cursor.setVisibility(View.GONE);
@@ -498,6 +498,10 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         },250);
     }
     private void showSourceError(){
+        if(web==null || pageFailed || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
+        web.evaluateJavascript("!!(window.RiveTVServers && RiveTVServers.searching())",result->{if(!"true".equals(result))revealSourceError();});
+    }
+    private void revealSourceError(){
         if(web==null || pageFailed || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
         sourceError=true;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.VISIBLE);errorRetry.setText(R.string.source_servers);
         errorText.setText(R.string.source_blocked);
