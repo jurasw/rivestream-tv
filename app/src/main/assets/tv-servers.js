@@ -222,7 +222,7 @@
   function leave() {
     stop();
     if (window.RiveTVPlayback && RiveTVPlayback.flush) RiveTVPlayback.flush();
-    if (history.length > 1) history.back(); else location.assign('/');
+    if (window.next && window.next.router) window.next.router.push('/'); else location.assign('/');
     return true;
   }
   var api = {

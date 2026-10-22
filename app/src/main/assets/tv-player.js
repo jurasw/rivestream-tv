@@ -867,7 +867,7 @@
     else if (message.action === 'cancelNext') playback().cancelNext();
     else if (message.action === 'subtitles') playback().subtitles(typeof message.value === 'string' ? message.value.slice(0,80) : null);
     else if (message.action === 'site') {if (window.RiveTV && window.RiveTV.siteControls) window.RiveTV.siteControls(true);else playback().reveal();}
-    else if (message.action === 'exit') {playback().flush();if (history.length > 1) history.back();else location.assign('/');}
+    else if (message.action === 'exit') {playback().flush();if (window.next && window.next.router) window.next.router.push('/');else location.assign('/');}
     else if (message.action === 'episode' && info.type === 'tv' && rootView) {
       var target = rootView.episodes.find(function (item) {return String(item.episode) === String(message.episode) && String(item.season) === String(message.season);});
       if (!target) return;
