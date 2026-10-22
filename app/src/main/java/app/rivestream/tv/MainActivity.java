@@ -190,7 +190,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));
             refreshStorageBootstrap();
         }
-        navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js");
+        navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js")+"\n"+readAsset("tv-shell.js");
         web.setOnFocusChangeListener((v,focus)->{if(focus)setRailExpanded(false);else stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
         cursor=new CursorView();
         cursor.setVisibility(View.GONE);
@@ -344,9 +344,10 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         boolean watch="/watch".equals(path);
         if(watchQuick!=null)watchQuick.setVisibility(watch && pageFailed?View.VISIBLE:View.GONE);
         if(errorPlayback!=null)errorPlayback.setVisibility(watch?View.VISIBLE:View.GONE);
-        rail.setVisibility(watch?View.GONE:View.VISIBLE);
+        boolean shell=java.util.Arrays.asList("/","/movie","/tv","/library","/search","/detail").contains(path==null||path.isEmpty()?"/":path);
+        rail.setVisibility(watch||shell?View.GONE:View.VISIBLE);
         FrameLayout.LayoutParams contentParams=(FrameLayout.LayoutParams)content.getLayoutParams();
-        int margin=watch?0:dp(84);if(contentParams.leftMargin!=margin){contentParams.leftMargin=margin;content.setLayoutParams(contentParams);}
+        int margin=watch||shell?0:dp(84);if(contentParams.leftMargin!=margin){contentParams.leftMargin=margin;content.setLayoutParams(contentParams);}
         if(watch)web.requestFocus();
         String[] paths={"/","/search","/movie","/tv","/library","/settings"};
         for(int i=0;i<navButtons.size();i++)navButtons.get(i).setSelected(paths[i].equals(path));
@@ -459,7 +460,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private void monitorPageError(int generation){
         handler.postDelayed(()->{
             if(web==null || generation!=pageGeneration || pageFailed)return;
-            String stateScript=sourceError ? "window.RiveTV ? (Array.from(document.querySelectorAll('iframe')).some(f=>/^https:\\/\\/primesrc\\.me\\//.test(f.src)) ? RiveTV.pageState() : 'source-changed') : 'loading'" : "window.RiveTV ? RiveTV.pageState() : 'loading'";
+            String stateScript=sourceError ? "window.RiveTV ? (window.RiveTVPlayer && RiveTVPlayer.active() ? 'source-changed' : Array.from(document.querySelectorAll('iframe')).some(f=>/^https:\\/\\/primesrc\\.me\\//.test(f.src)) ? RiveTV.pageState() : 'source-changed') : 'loading'" : "window.RiveTV ? RiveTV.pageState() : 'loading'";
             web.evaluateJavascript(stateScript,result->{
                 if(web==null || generation!=pageGeneration || pageFailed)return;
                 if("\"source-changed\"".equals(result)){sourceError=false;watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);}

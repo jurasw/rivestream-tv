@@ -225,6 +225,21 @@
     chain.forEach(function (node) {if (!node.hasAttribute('data-rive-main')) node.setAttribute('data-rive-main','');});
     marked = chain;
   }
+  var frameMarks = [], frameMarked = 0;
+  function markFrame(frame) {
+    var chain = [];
+    for (var node = frame; node && node !== document.body && node !== document.documentElement; node = node.parentElement) chain.push(node);
+    frameMarks.forEach(function (node) {if (chain.indexOf(node) === -1) node.removeAttribute('data-rive-main');});
+    chain.forEach(function (node) {if (!node.hasAttribute('data-rive-main')) node.setAttribute('data-rive-main','');});
+    frameMarks = chain;frameMarked = Date.now();
+    mount();attach();
+    if (!document.documentElement.hasAttribute('data-rive-player')) document.documentElement.setAttribute('data-rive-player','');
+  }
+  function unmarkFrame() {
+    if (!frameMarks.length) return;
+    frameMarks.forEach(function (node) {node.removeAttribute('data-rive-main');});frameMarks = [];
+    if (!video) document.documentElement.removeAttribute('data-rive-player');
+  }
   var events = ['play','pause','playing','waiting','seeking','seeked','ended','error','canplay','ratechange','volumechange','loadedmetadata'];
   function bind(next) {
     if (video) events.forEach(function (name) {video.removeEventListener(name,onVideo);});
@@ -775,6 +790,7 @@
       syncSubtitles();buffering();renderError();
       if (!visible && !introShown && !video.paused && video.currentTime < 30) intro();
     }
+    if (frameMarks.length && Date.now() - frameMarked > 4000) unmarkFrame();
     if (root) rootTick();
     report(true);
   }
@@ -880,7 +896,10 @@
     var frame = childFrame(event.source);
     if (!frame || typeof msg.id !== 'string' || msg.id.length > 40) return;
     if (msg.riveTV === 'action' && !fresh(msg.seq)) return;
-    if (!root) {window.parent.postMessage(msg,'*');return;}
+    if (!root) {
+      if (msg.riveTV === 'overlay') {if (msg.active === true) markFrame(frame);else unmarkFrame();}
+      window.parent.postMessage(msg,'*');return;
+    }
     if (msg.riveTV === 'overlay') {
       if (msg.active !== true && !(remote && remote.id === msg.id)) return;
       if (msg.ready !== true && rootView) down({riveTV:'view',view:rootView});
