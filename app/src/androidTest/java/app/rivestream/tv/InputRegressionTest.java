@@ -50,6 +50,17 @@ public final class InputRegressionTest extends Instrumentation {
         for(AccessibilityWindowInfo window:getUiAutomation().getWindows())if(window.getType()==AccessibilityWindowInfo.TYPE_INPUT_METHOD)return true;
         return false;
     }
+    private android.webkit.WebResourceRequest request(String url,boolean main,boolean gesture){
+        android.net.Uri uri=android.net.Uri.parse(url);
+        return new android.webkit.WebResourceRequest(){
+            @Override public android.net.Uri getUrl(){return uri;}
+            @Override public boolean isForMainFrame(){return main;}
+            @Override public boolean isRedirect(){return false;}
+            @Override public boolean hasGesture(){return gesture;}
+            @Override public String getMethod(){return "GET";}
+            @Override public java.util.Map<String,String> getRequestHeaders(){return java.util.Collections.emptyMap();}
+        };
+    }
     private void key(int action,int code,long start,int repeat){sendKeySync(new KeyEvent(start,SystemClock.uptimeMillis(),action,code,repeat));}
     private void liveEpisodes() throws Exception {
         runOnMainSync(()->web.loadUrl("https://www.rivestream.app/detail?type=tv&id=12971"));
@@ -200,7 +211,32 @@ public final class InputRegressionTest extends Instrumentation {
             runOnMainSync(()->{try{((android.app.Dialog)field("activeDialog")).dismiss();invoke("setPlaybackMode",new Class<?>[]{String.class},"embed");}catch(Exception e){throw new RuntimeException(e);}});
             waitJs("localStorage.getItem('RiveStreamWatchMode')==='embed' && localStorage.getItem('RiveStreamEmbedMode')==='true'");
             check("Embed recovery persists the mode without React","\"embed\"".equals(js("localStorage.getItem('RiveStreamWatchMode')")));
-            result.putString("stream","\n"+results);result.putInt("passed",28);outcome=Activity.RESULT_OK;
+            check("curated ad hosts match subdomains only",MainActivity.adHost("c.adsco.re") && MainActivity.adHost("S10.HISTATS.COM") && !MainActivity.adHost("notadsco.re") && !MainActivity.adHost("vidsrc.sh") && !MainActivity.adHost(null));
+            load("/watch?type=movie&id=45745","<button aria-label='Select Aggregator Server'>Server 4 (Single-Server)</button><iframe id='provider' style='position:absolute;left:200px;top:100px;width:400px;height:200px;border:0' srcdoc='<p>provider</p>'></iframe>");
+            AtomicReference<Object> intercepted=new AtomicReference<>(),allowed=new AtomicReference<>();AtomicReference<Boolean> adNavigation=new AtomicReference<>(),exitNavigation=new AtomicReference<>(),adFrame=new AtomicReference<>(),playerFrame=new AtomicReference<>(),window=new AtomicReference<>();
+            runOnMainSync(()->{android.webkit.WebViewClient client=web.getWebViewClient();
+                intercepted.set(client.shouldInterceptRequest(web,request("https://c.adsco.re/script.js",false,false)));allowed.set(client.shouldInterceptRequest(web,request("https://vidsrc.sh/embed/movie/45745",false,false)));
+                adNavigation.set(client.shouldOverrideUrlLoading(web,request("https://rapidadexchange.com/do/c.php",true,false)));exitNavigation.set(client.shouldOverrideUrlLoading(web,request("https://casino.example/landing",true,true)));
+                adFrame.set(client.shouldOverrideUrlLoading(web,request("https://www.predictivdisplay.com/jump/next.php",false,false)));playerFrame.set(client.shouldOverrideUrlLoading(web,request("https://vidsrc.sh/embed/movie/45745",false,false)));
+                window.set(web.getWebChromeClient().onCreateWindow(web,false,true,null));});
+            check("ad and tracker requests are answered locally",intercepted.get()!=null && ((android.webkit.WebResourceResponse)intercepted.get()).getStatusCode()==204 && allowed.get()==null);
+            check("ad hosts cannot navigate the top frame",adNavigation.get());
+            check("clicks during playback cannot leave Rivestream",exitNavigation.get() && field("activeDialog")==null);
+            check("ad frames cannot replace the player frame",adFrame.get() && !playerFrame.get());
+            check("new windows and popups are refused",!window.get());
+            js("(()=>{let f=document.getElementById('provider');f.contentWindow.eval(\"setInterval(()=>parent.postMessage({riveTV:'captcha',kind:'Cloudflare Turnstile',x:200,y:100},'*'),500)\");return true})()");
+            long captchaDeadline=SystemClock.uptimeMillis()+12000;while(((View)field("errorCursor")).getVisibility()!=View.VISIBLE && SystemClock.uptimeMillis()<captchaDeadline)Thread.sleep(100);
+            check("captcha-gated server is surfaced in the error bar",((View)field("errorBar")).getVisibility()==View.VISIBLE && ((android.widget.TextView)field("errorText")).getText().toString().contains("Cloudflare Turnstile") && "Serwery".contentEquals(((android.widget.Button)field("errorRetry")).getText()));
+            check("captcha keeps the page usable and is not dismissed",!((Boolean)field("pageFailed")) && "1".equals(js("document.querySelectorAll('#provider').length")));
+            runOnMainSync(()->{try{((android.widget.Button)field("errorCursor")).performClick();}catch(Exception e){throw new RuntimeException(e);}});
+            AtomicReference<float[]> pointer=new AtomicReference<>();runOnMainSync(()->{try{View c=(View)field("cursor");java.lang.reflect.Field x=c.getClass().getDeclaredField("x"),y=c.getClass().getDeclaredField("y");x.setAccessible(true);y.setAccessible(true);pointer.set(new float[]{x.getFloat(c)/web.getWidth(),y.getFloat(c)/web.getHeight()});}catch(Exception e){throw new RuntimeException(e);}});
+            String expected=js("JSON.stringify([400/innerWidth,200/innerHeight])");org.json.JSONArray target=new org.json.JSONArray(new org.json.JSONTokener(expected).nextValue().toString());
+            check("Kursor puts the remote pointer on the captcha without clicking it",(Boolean)field("pointerMode") && Math.abs(pointer.get()[0]-target.getDouble(0))<.02 && Math.abs(pointer.get()[1]-target.getDouble(1))<.02);
+            runOnMainSync(()->{try{invoke("togglePointer",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});
+            runOnMainSync(()->{try{invoke("showSelect",new Class<?>[]{org.json.JSONObject.class},new org.json.JSONObject("{\"options\":[{\"index\":0,\"label\":\"Server 1 (VidsrcMe)\"},{\"index\":1,\"label\":\"Server 4 (Single-Server)\",\"selected\":true}]}"));}catch(Exception e){throw new RuntimeException(e);}});
+            AtomicReference<String> marked=new AtomicReference<>();runOnMainSync(()->{try{android.app.Dialog d=(android.app.Dialog)field("activeDialog");android.view.ViewGroup panel=(android.view.ViewGroup)d.findViewById(android.R.id.content);marked.set(((android.widget.Button)panel.findViewWithTag("rive-dialog-action-0")).getText()+"|"+((android.widget.Button)panel.findViewWithTag("rive-dialog-action-1")).getText());d.dismiss();}catch(Exception e){throw new RuntimeException(e);}});
+            check("server list marks the captcha-gated server",marked.get().endsWith("Server 4 (Single-Server)  · weryfikacja") && !marked.get().split("\\|")[0].contains("weryfikacja"));
+            result.putString("stream","\n"+results);result.putInt("passed",38);outcome=Activity.RESULT_OK;
         }catch(Throwable error){result.putString("stream","\n"+results+"FAIL "+error+"\n");}
         finally{if(activity!=null)runOnMainSync(()->activity.finish());}
         finish(outcome,result);

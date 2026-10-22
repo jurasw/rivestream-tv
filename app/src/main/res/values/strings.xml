@@ -2,6 +2,7 @@
 <resources>
     <string name="source_servers">Serwery</string>
     <string name="source_blocked">To źródło wymaga weryfikacji dostawcy. Wybierz inny serwer.</string>
+    <string name="source_captcha">Serwer wymaga weryfikacji (%1$s). Wybierz Kursor i rozwiąż ją pilotem albo wybierz inny serwer.</string>
     <string name="error_refresh">Odśwież</string>
     <string name="update_installing">Instaluję aktualizację Rivestream TV…</string>
 </resources>

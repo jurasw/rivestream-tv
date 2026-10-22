@@ -1,5 +1,11 @@
 # Rivestream TV — rozwój
 
+## Reklamy i weryfikacje serwerów Embed
+
+Przegląd pierwszych 15 serwerów Embed (Sintel, Dragon Ball Z S01E38; Chrome 155 i emulator WebView) jest w `.artifacts/server-audit/`. Aplikacja odrzuca nowe okna (`onCreateWindow`, `window.open` i linki `target` w ramkach dostawców), blokuje opuszczenie Rivestream podczas `/watch` i nawigację ramek do hostów reklamowych, a żądania do krótkiej listy `AD_HOSTS` z przeglądu dostają lokalną odpowiedź 204. `tv-ads.js` usuwa przezroczyste nakładki przechwytujące kliknięcia (`#dontfoid`), reklamy pełnoekranowe w shadow DOM (`doskip`/`prclck`) i z „Skip ad”, a także fałszywe kody QR „not a robot”. Odtwarzacz, wideo i lista serwerów pozostają nietknięte.
+
+Aplikacja nie rozwiązuje ani nie klika captchy. Widoczny Cloudflare Turnstile, hCaptcha lub reCAPTCHA w ramce dostawcy pokazuje pasek z przyciskami Kursor (kursor pilota nad weryfikacją) i Serwery; serwer jest oznaczony „weryfikacja” na liście. Na czas weryfikacji usuwanie nakładek w tej ramce jest wstrzymane. Testy: `scripts/test-playback.sh` (23 kontrole reklam na lokalnych stronach) i `scripts/test-input.sh` (10 kontroli WebView).
+
 ## Auto next
 
 W Ustawieniach, pod wyborem motywu, jest przełącznik **Auto next — następny odcinek** (domyślnie wyłączony) oraz czas pokazania przycisku: po zakończeniu albo 30–180 sekund przed końcem. Domyślnie przycisk pojawia się 90 sekund przed końcem, maksymalnie na ostatnie 10% odcinka. To przybliżenie outro na podstawie czasu wideo, nie rozpoznawanie napisów końcowych.

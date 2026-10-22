@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="/app/src/main/assets/tv-ads.js"></script>
+<style>html,body{margin:0;width:100%;height:100%;background:#000}</style></head><body>
+<div class="jwplayer" id="player" style="position:relative;width:100%;height:100%"><video id="feature" style="width:100%;height:100%"></video><div id="gesture" style="position:absolute;inset:0;z-index:20"></div></div>
+<div id="toaster" style="position:fixed;inset:16px;z-index:9999;pointer-events:none"></div>
+<a id="popunder" href="https://ads.example/landing" target="_blank">ad</a>
+<script>
+var cover=document.createElement('div');cover.id='dontfoid';cover.style.cssText='position:fixed;inset:0;z-index:2147483647';
+var host=document.createElement('div');host.setAttribute('doskip','1');host.setAttribute('prclck','1');
+host.attachShadow({mode:'closed'}).innerHTML='<div style="position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.8)">Skip ad</div>';
+var shadowAd=document.createElement('div');shadowAd.id='shadowad';
+shadowAd.attachShadow({mode:'closed'}).innerHTML='<div style="position:fixed;inset:0;z-index:2147483640;background:#123">Casino</div>';
+var promo=document.createElement('div');promo.id='interstitial';promo.style.cssText='position:fixed;inset:0;z-index:2147483600;background:#222';
+promo.innerHTML='<video id="adclip"></video><button>Go to website</button><button>Skip ad</button>';
+setTimeout(function(){document.body.appendChild(cover);document.body.appendChild(host);document.documentElement.appendChild(shadowAd);document.body.appendChild(promo);},200);
+</script></body></html>

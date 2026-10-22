@@ -60,6 +60,8 @@ import java.util.ArrayList;
 /** A small TV browser dedicated to Rivestream; no scraping or private API dependency. */
 public final class MainActivity extends Activity implements AppUpdater.Host {
     private static final String HOME = "https://www.rivestream.app/";
+    static final String[] AD_HOSTS={"adsco.re","cdn4ads.com","llvpn.com","luugy.com","rtmark.net","rapidadexchange.com","adexchangerapid.com","usrpubtrck.com","usrpubtrk.com","intellipopup.com","histats.com","predictivdisplay.com","trackzonas.com","rlsredirect.com","misradstore.com","panterlorius.com","cokedpariti.com","unlaxguttus.com","urbanfungose.com","mc.yandex.ru","mc.yandex.com","clarity.ms"};
+    static boolean adHost(String host){if(host==null)return false;host=host.toLowerCase(java.util.Locale.ROOT);for(String ad:AD_HOSTS)if(host.equals(ad)||host.endsWith("."+ad))return true;return false;}
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ArrayList<Button> navButtons = new ArrayList<>();
     private WebView web;
@@ -90,7 +92,12 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private LinearLayout errorBar;
     private Button errorRetry, watchQuick;
     private LinearLayout errorPlayback;
+    private Button errorCursor;
     private boolean sourceError;
+    private String captchaKind;
+    private float captchaX=.5f,captchaY=.5f;
+    private long lastBlockNotice;
+    private final HashSet<String> captchaServers=new HashSet<>();
     private int heldArrow, arrowGeneration;
     private boolean arrowInFlight, arrowRepeated, centerPressedHere, keyboardRequested;
     private long suppressCenterUntil;
@@ -195,7 +202,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         errorBar.setPadding(dp(14),dp(8),dp(10),dp(8));errorBar.setBackground(panelBackground(0xff1f1c1c,8));errorBar.setElevation(dp(8));
         errorText=label("",13,Color.WHITE);errorText.setMaxLines(2);errorText.setEllipsize(android.text.TextUtils.TruncateAt.END);
         errorBar.addView(errorText,new LinearLayout.LayoutParams(0,-2,1));
-        errorRetry=makeButton("Odśwież");errorRetry.setOnClickListener(v->{web.requestFocus();if(sourceError){sourceError=false;watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);});}else web.reload();});
+        errorRetry=makeButton("Odśwież");errorRetry.setOnClickListener(v->{web.requestFocus();if(sourceError){sourceError=false;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);});}else web.reload();});
         errorRetry.setBackgroundResource(R.drawable.action_background);errorRetry.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams retryParams=new LinearLayout.LayoutParams(dp(105),dp(38));retryParams.leftMargin=dp(8);errorBar.addView(errorRetry,retryParams);
         Button dismissError=makeButton("Zamknij");dismissError.setBackgroundResource(R.drawable.action_background);dismissError.setGravity(Gravity.CENTER);dismissError.setOnClickListener(v->{errorBar.setVisibility(View.GONE);if(!pageFailed)watchQuick.setVisibility(View.GONE);web.requestFocus();});
@@ -212,6 +219,9 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(dp(88),dp(38));modeParams.leftMargin=dp(8);errorPlayback.addView(button,modeParams);
         }
         errorBar.addView(errorPlayback,1,new LinearLayout.LayoutParams(-2,-2));errorPlayback.setVisibility(View.GONE);
+        errorCursor=makeButton("Kursor");errorCursor.setBackgroundResource(R.drawable.action_background);errorCursor.setGravity(Gravity.CENTER);errorCursor.setOnKeyListener(errorKeys);
+        errorCursor.setOnClickListener(v->{if(!pointerMode)togglePointer();cursor.x=captchaX*web.getWidth();cursor.y=captchaY*web.getHeight();cursor.invalidate();web.requestFocus();});
+        LinearLayout.LayoutParams cursorParams=new LinearLayout.LayoutParams(dp(95),dp(38));cursorParams.leftMargin=dp(8);errorBar.addView(errorCursor,2,cursorParams);errorCursor.setVisibility(View.GONE);
         watchQuick=makeButton("⋮");watchQuick.setBackgroundResource(R.drawable.action_background);watchQuick.setGravity(Gravity.CENTER);watchQuick.setContentDescription("Opcje odtwarzania");watchQuick.setOnClickListener(v->showMenu());
         watchQuick.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_LEFT){if(event.getAction()==KeyEvent.ACTION_DOWN)web.requestFocus();return true;}return false;});
         FrameLayout.LayoutParams quickParams=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT|Gravity.BOTTOM);quickParams.rightMargin=dp(12);quickParams.bottomMargin=dp(12);
@@ -224,11 +234,16 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             @Override public void onPageCommitVisible(WebView w,String url){
                 if(!pageFailed){if(isRive(Uri.parse(url)))injectNavigation(w);else loading.setVisibility(View.GONE);}
             }
+            @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest request){
+                return adHost(request.getUrl().getHost())?new android.webkit.WebResourceResponse("text/plain","UTF-8",204,"No Content",null,new java.io.ByteArrayInputStream(new byte[0])):null;
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest request){
-                if(!request.isForMainFrame()) return false;
                 Uri uri=request.getUrl();
+                if(!request.isForMainFrame()) return adHost(uri.getHost());
                 if(isRive(uri)) return false;
-                if(request.hasGesture() && "https".equals(uri.getScheme())) {
+                String current=w.getUrl();
+                if(adHost(uri.getHost()) || !"https".equals(uri.getScheme()) || (current!=null && isRive(Uri.parse(current)) && "/watch".equals(Uri.parse(current).getPath()))){blockedNotice("Zablokowano przekierowanie reklamy.");return true;}
+                if(request.hasGesture()) {
                     showTvDialog("Link poza Rivestream",uri.getHost(),new String[]{"Anuluj","Otwórz"},new Runnable[]{null,()->web.loadUrl(uri.toString())},false);
                 }
                 return true;
@@ -281,7 +296,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 immersive();
             }
             @Override public void onHideCustomView(){hideFullscreen();}
-            @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean gesture,android.os.Message result){return false;}
+            @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean gesture,android.os.Message result){blockedNotice("Zablokowano wyskakujące okno.");return false;}
         });
         setContentView(root);
         web.requestFocus();
@@ -374,13 +389,37 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         if(searchEditor!=null)finishKeyboardEditing();
         stopArrowNavigation();arrowGeneration++;
         errorBar.setVisibility(View.GONE);
-        sourceError=false;watchQuick.setVisibility(View.GONE);loadingUrl=url;pageFailed=false;pageGeneration++;loadingStarted=SystemClock.uptimeMillis();
+        sourceError=false;captchaKind=null;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);loadingUrl=url;pageFailed=false;pageGeneration++;loadingStarted=SystemClock.uptimeMillis();
         loading.animate().cancel();loading.setAlpha(1f);
         progress.setVisibility(View.VISIBLE);
         status.setText("/watch".equals(Uri.parse(url).getPath())?"Przygotowuję odtwarzacz…":"Ładuję Twoje kino…");
         loading.getChildAt(loading.getChildCount()-1).setVisibility(View.GONE);
         loading.setVisibility(View.VISIBLE);
-        if(isRive(Uri.parse(url)))pollPageReady(pageGeneration);
+        if(isRive(Uri.parse(url))){pollPageReady(pageGeneration);monitorCaptcha(pageGeneration);}
+    }
+    private void monitorCaptcha(int generation){
+        handler.postDelayed(()->{
+            if(web==null || generation!=pageGeneration)return;
+            web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.captcha() : null",result->{
+                if(web==null || generation!=pageGeneration)return;
+                JSONObject found=null;
+                try{Object value=new org.json.JSONTokener(result).nextValue();if(value instanceof String)found=new JSONObject((String)value);}catch(Exception ignored){}
+                if(found!=null){captchaX=(float)found.optDouble("x",.5);captchaY=(float)found.optDouble("y",.5);if(captchaKind==null)showCaptcha(found.optString("kind","Cloudflare"),found.optString("server"));}
+                else if(captchaKind!=null){captchaKind=null;if(sourceError && errorCursor.getVisibility()==View.VISIBLE){sourceError=false;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);}}
+                monitorCaptcha(generation);
+            });
+        },1500);
+    }
+    private void showCaptcha(String kind,String server){
+        if(web==null || pageFailed || web.getUrl()==null || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
+        captchaKind=kind;if(!server.isEmpty())captchaServers.add(server);
+        sourceError=true;errorRetry.setText(R.string.source_servers);errorCursor.setVisibility(View.VISIBLE);watchQuick.setVisibility(View.VISIBLE);
+        errorText.setText(getString(R.string.source_captcha,kind));errorBar.setVisibility(View.VISIBLE);
+        if(customView==null && activeDialog==null && !keyboardOpen()){stopArrowNavigation();errorCursor.requestFocus();}
+    }
+    private void blockedNotice(String message){
+        long now=SystemClock.uptimeMillis();if(now-lastBlockNotice<8000)return;
+        lastBlockNotice=now;showNotice(message);
     }
     private void monitorPageError(int generation){
         handler.postDelayed(()->{
@@ -424,13 +463,13 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     }
     private void showSourceError(){
         if(web==null || pageFailed || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
-        sourceError=true;watchQuick.setVisibility(View.VISIBLE);errorRetry.setText(R.string.source_servers);
+        sourceError=true;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.VISIBLE);errorRetry.setText(R.string.source_servers);
         errorText.setText(R.string.source_blocked);
         errorBar.setVisibility(View.VISIBLE);
         if(customView==null && activeDialog==null && !keyboardOpen()){stopArrowNavigation();errorRetry.requestFocus();}
     }
     private void showError(String message){
-        sourceError=false;errorRetry.setText(R.string.error_refresh);
+        sourceError=false;errorCursor.setVisibility(View.GONE);errorRetry.setText(R.string.error_refresh);
         pageFailed=true;if(web!=null && web.getUrl()!=null && "/watch".equals(Uri.parse(web.getUrl()).getPath()))watchQuick.setVisibility(View.VISIBLE);loading.animate().cancel();loading.setVisibility(View.GONE);
         errorText.setText(message.replace('\n',' '));errorBar.setVisibility(View.VISIBLE);
         // Keep the page and playback controls usable; Up at the top enters this bar.
@@ -685,7 +724,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         for(int i=0;i<options.length();i++){
             JSONObject option=options.optJSONObject(i);if(option==null || option.optBoolean("disabled"))continue;
             final int index=option.optInt("index");if(option.optBoolean("selected"))selectedIndex=labels.size();
-            labels.add((option.optBoolean("selected")?"✓  ":"     ")+option.optString("label"));
+            labels.add((option.optBoolean("selected")?"✓  ":"     ")+option.optString("label")+(captchaServers.contains(option.optString("label").trim())?"  · weryfikacja":""));
             callbacks.add(()->web.evaluateJavascript("window.RiveTV && RiveTV.choose("+index+")",result->{if(multiple)activate();}));
         }
         if(labels.isEmpty())return;
