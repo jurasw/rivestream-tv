@@ -5,7 +5,7 @@
   var context = null, route = '', videos = new WeakMap(), clicked = new WeakSet();
   var started = false, controls = false, hideTimer, lastSaved = 0;
   var nextPanel, nextSettings, nextState = null, nextCountdown = 0, nextCancelled = false, advancing = false;
-  var nextPreferences = {autoNext:false,outroSeconds:90};
+  var nextPreferences = {autoNext:false,outroSeconds:90,subtitles:null}, nextView = {eligible:false};
   var preferencesLoaded = false;
   function loadPreferences() {
     if (preferencesLoaded) return;
@@ -15,6 +15,7 @@
       var storedPreferences = JSON.parse(localStorage.getItem('RiveTVPlaybackSettings') || '{}');
       nextPreferences.autoNext = storedPreferences.autoNext === true;
       if ([0,30,60,90,120,180].indexOf(storedPreferences.outroSeconds) !== -1) nextPreferences.outroSeconds = storedPreferences.outroSeconds;
+      if (typeof storedPreferences.subtitles === 'string' && storedPreferences.subtitles.length <= 80) nextPreferences.subtitles = storedPreferences.subtitles;
     } catch (_) {}
   }
   function persistPreferences() {
@@ -79,7 +80,8 @@
     var eligible = context && context.type === 'tv' && state && state.session === context.session &&
       (state.ended || state.duration - state.time <= Math.min(nextPreferences.outroSeconds,state.duration * .1)) &&
       !advancing && !!nextEpisodeAction() && !window.__riveSleepTriggered && !window.__riveSleepEndOfVideoActive;
-    if (!eligible) {nextCountdown = 0;if (nextPanel) nextPanel.hidden = true;return;}
+    var overlay = !!(window.RiveTVPlayer && window.RiveTVPlayer.active());
+    if (!eligible) {nextCountdown = 0;nextView = {eligible:false};if (nextPanel) nextPanel.hidden = true;return;}
     if (!nextPanel) {
       nextPanel = document.createElement('div');nextPanel.id = 'rive-next-episode';nextPanel.hidden = true;
       nextPanel.innerHTML = '<button type="button">Następny odcinek</button><button type="button">Anuluj auto next</button>';
@@ -88,14 +90,15 @@
       document.body.appendChild(nextPanel);
     }
     var appeared = nextPanel.hidden;
-    nextPanel.hidden = false;
+    nextPanel.hidden = overlay;
     var auto = nextPreferences.autoNext && !nextCancelled;
     // Buffering, pauses, a background app and stale provider reports freeze the countdown.
     if (auto && (!state.paused || state.ended) && !state.buffering && !document.hidden && Date.now() - state.received < 2500) nextCountdown++;
     var label = auto ? 'Następny odcinek (za ' + Math.max(0,15-nextCountdown) + ' s)' : 'Następny odcinek';
     var button = nextPanel.querySelector('button');if (button.textContent !== label) button.textContent = label;
     nextPanel.querySelectorAll('button')[1].hidden = !auto;
-    if (appeared && window.RiveTV) window.RiveTV.focusNext();
+    nextView = {eligible:true,auto:auto,remaining:auto ? Math.max(0,15-nextCountdown) : null};
+    if (appeared && !overlay && window.RiveTV) window.RiveTV.focusNext();
     if (nextCountdown >= 15) advanceEpisode();
   }
   var style = document.createElement('style');
@@ -258,6 +261,20 @@
     reveal:function () {if (!this.hidden()) return false;setControls(true);return true;},
     touch:function () {if (context && controls) setControls(true);},
     command:command,
+    session:function () {if (root) updateRoute();return context ? context.session : null;},
+    info:function () {
+      if (!root) return null;
+      updateRoute();
+      if (!context) return null;
+      return {type:context.type,id:context.id,season:context.season,episode:context.episode,next:nextView,
+        hasNext:context.type === 'tv' && !advancing && !!nextEpisodeAction(),subtitles:nextPreferences.subtitles};
+    },
+    cancelNext:function () {nextCancelled = true;nextCountdown = 0;updateNext();},
+    subtitles:function (value) {
+      if (value !== null && (typeof value !== 'string' || value.length > 80)) return;
+      loadPreferences();nextPreferences.subtitles = value;persistPreferences();
+    },
+    conceal:function () {if (!controls) return false;setControls(false);return true;},
     flush:function () {document.querySelectorAll('video').forEach(report);sendChildren({riveTV:'command',action:'pause'});}
   };
   // Own the end transition so the site's unconditional auto-next cannot bypass

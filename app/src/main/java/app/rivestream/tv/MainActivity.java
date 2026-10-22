@@ -168,7 +168,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 (view,message,origin,mainFrame,reply)->{if(mainFrame){viewingStore.accept(message.getData());refreshStorageBootstrap();}});
         }
         bootstrapScript=readAsset("tv-bootstrap.js");
-        compatibilityScript=readAsset("tv-compat.js")+"\n"+readAsset("tv-playback.js")+"\n"+readAsset("tv-ads.js");
+        compatibilityScript=readAsset("tv-compat.js")+"\n"+readAsset("tv-playback.js")+"\n"+readAsset("tv-player.js")+"\n"+readAsset("tv-ads.js");
         if(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)){
             documentStartSupported=true;
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));

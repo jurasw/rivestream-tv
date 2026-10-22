@@ -184,7 +184,11 @@
     return setFocus(!hasNavigated && primary ? primary : selected && available(selected) ? selected : primary || visible[0], false);
   }
   function stopMove() { document.documentElement.removeAttribute('data-rive-repeat'); }
+  function overlayKeys() {
+    return !!(window.RiveTVPlayer && RiveTVPlayer.owns() && dialogScope() === document);
+  }
   function move(direction, repeated) {
+    if (overlayKeys()) {RiveTVPlayer.key(direction, repeated === true);return 'ok';}
     if (window.RiveTVPlayback && RiveTVPlayback.isWatch()) {
       if (RiveTVPlayback.hidden()) {
         if (direction === 'down') {revealPlayback();return 'ok';}
@@ -279,6 +283,7 @@
       (RiveTVPlayback.hidden() && !(selected && selected.closest('#rive-next-episode') && available(selected)) || selected && /^(IFRAME|VIDEO)$/.test(selected.tagName) && available(selected) && dialogScope() === document);
   }
   function target() {
+    if (overlayKeys()) return {overlay:true};
     if (playbackTarget()) return {playback:true};
     collect();
     if (!selected || !available(selected)) first();
@@ -298,6 +303,7 @@
       x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight };
   }
   function activate() {
+    if (overlayKeys()) return RiveTVPlayer.key('ok');
     if (playbackTarget()) return RiveTVPlayback.command('toggle');
     if (window.RiveTVPlayback) RiveTVPlayback.touch();
     collect();
@@ -316,7 +322,7 @@
     return dropdownTrigger ? 'dropdown' : true;
   }
   function sources() {
-    revealPlayback();
+    siteControls();
     var trigger = document.getElementById('source');
     if (!available(trigger)) return false;
     active = true;
@@ -406,15 +412,22 @@
     return true;
   }
   function revealPlayback() {
+    if (window.RiveTVPlayer && RiveTVPlayer.active()) return RiveTVPlayer.back();
+    return siteControls();
+  }
+  function siteControls(preferSource) {
     if (!window.RiveTVPlayback || !RiveTVPlayback.reveal()) return false;
     active = true;dirty = true;playerEngaged = false;selected = null;
     var control = collect().filter(function (el) {return el.tagName !== 'IFRAME' && el.tagName !== 'VIDEO';})[0];
-    var next = document.querySelector('#rive-next-episode button');
-    if (next && available(next)) setFocus(next,false);
+    var next = document.querySelector('#rive-next-episode button'), source = document.getElementById('source');
+    if (preferSource && source) setTimeout(function () {if (available(source) && !RiveTVPlayback.hidden()) setFocus(source,false);},400);
+    if (preferSource && available(source)) setFocus(source,false);
+    else if (next && available(next)) setFocus(next,false);
     else if (control) setFocus(control,false);
     return true;
   }
   function media(action) {
+    if (overlayKeys() && /^(toggle|forward|rewind)$/.test(action)) return RiveTVPlayer.key(action);
     if (window.RiveTVPlayback && RiveTVPlayback.isWatch()) return RiveTVPlayback.command(action);
     var found = false;
     function visit(doc) {
@@ -528,6 +541,6 @@
   }
   function resume() {active = true; first();}
   window.RiveTV = { sources:sources, stopMove:stopMove, finishEditing:finishEditing, pageState:pageState, first: first, move: move, target: target, activate: activate, choose: choose, dropdown: dropdown, closeDropdown: closeDropdown, search: search, media: media, suspend: suspend, resume: resume,
-    focusNext:focusNext, revealPlayback:revealPlayback, enterPlayer:function () {playerEngaged=true;}, releasePlayer:releasePlayer };
+    focusNext:focusNext, revealPlayback:revealPlayback, siteControls:siteControls, enterPlayer:function () {playerEngaged=true;}, releasePlayer:releasePlayer };
   setTimeout(first, 350);
 })();

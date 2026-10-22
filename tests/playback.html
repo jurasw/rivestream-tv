@@ -8,6 +8,7 @@
  try {
   localStorage.clear();
   var clock=100000, realNow=Date.now;Date.now=()=>clock;
+  var realInterval=window.setInterval.bind(window);
   var tick;window.setInterval=fn=>{tick=fn;return 1;};
   history.replaceState({},'', '/settings');
   var group=document.createElement('div');group.className='style_group__test';group.innerHTML='<button id="mode">Dark</button>';document.body.appendChild(group);
@@ -80,6 +81,66 @@
   RiveTVPlayback.command('toggle');check('second toggle resumes at time zero',!paused&&time===0);
   check('removed intro command is ignored',RiveTVPlayback.command('intro')===false&&time===0);
   Date.now=realNow;
+  var wait=ms=>new Promise(r=>setTimeout(r,ms));
+  function probe(frame){return new Promise(resolve=>{var done=e=>{if(e.source===frame.contentWindow&&e.data&&e.data.fixture==='probe'){removeEventListener('message',done);resolve(e.data);}};addEventListener('message',done);frame.contentWindow.postMessage({fixture:'probe'},'*');setTimeout(()=>resolve({}),1500);});}
+  async function press(key,times=1){for(var i=0;i<times;i++){if(key==='ok')RiveTV.activate();else RiveTV.move(key);await wait(120);}}
+  async function provider(kind){var frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.cssText='position:fixed;left:0;top:0;width:100vw;height:100vh;border:0';var loaded=new Promise(r=>frame.onload=r);frame.src='/tests/playback-provider.html#'+kind;document.body.appendChild(frame);await loaded;await wait(2600);return frame;}
+  video.remove();var overlayNext=0,pushed=null;window.next={router:{push:u=>pushed=u}};
+  var props2={season:'1',episode:'1',hasNextEpisode:true,onNextEpisode:()=>overlayNext++};
+  var fiberTop={stateNode:{}};fiberTop.stateNode.current=fiberTop;
+  var details={id:7,name:'Sintel Show',overview:'A girl searches for her dragon.',backdrop_path:'/b.jpg'};
+  var season={episodes:[{episode_number:1,season_number:1,name:'Pilot',overview:'First.',still_path:'/1.jpg'},{episode_number:2,season_number:1,name:'Dragon',overview:'Second episode synopsis.',still_path:'/2.jpg'}]};
+  handle.__reactFiber$fixture={memoizedProps:props2,memoizedState:null,return:{memoizedState:{memoizedState:details,next:{memoizedState:season,next:null}},return:fiberTop}};
+  history.replaceState({},'', '/watch?type=tv&id=7&season=1&episode=1');
+  var playbackTick=tick;window.setInterval=realInterval;realInterval(()=>playbackTick(),1000);
+  (0,eval)(await (await fetch('/app/src/main/assets/tv-player.js')).text());
+  var frame=await provider('jw'),state=await probe(frame);
+  check('overlay mounts in the provider frame that owns the video',state.overlay&&!state.hostHidden);
+  check('JW Player controls are hidden',state.providerHidden);
+  check('main video stays visible without native controls',state.videoVisible&&state.controls===false);
+  check('overlay controls start hidden while playing',!state.visible&&!state.paused);
+  check('remote center targets the overlay',RiveTV.target().overlay===true);
+  await press('ok');state=await probe(frame);
+  check('OK pauses and reveals controls on play',state.paused&&state.visible&&state.focus==='play');
+  check('series, episode and site actions are in the controls row',state.rows.join()==='play,rewind,forward,volume,next,episodes,tracks,speed');
+  check('Back with visible controls allows leaving the player',RiveTV.revealPlayback()===false);
+  var dup={riveTV:'key',owner:RiveTVPlayer.status().id,key:'ok',seq:'forwarded:1'};frame.contentWindow.postMessage(dup,'*');frame.contentWindow.postMessage(dup,'*');await wait(300);state=await probe(frame);
+  check('a key forwarded twice by a provider page toggles once',!state.paused);
+  await wait(3400);state=await probe(frame);
+  check('OK resumes and controls auto-hide after 3 s',!state.paused&&!state.visible);
+  await press('right');state=await probe(frame);
+  check('Right shows compact progress for scrubbing',state.visible&&state.compact&&state.focus&&state.focus.indexOf('progress')!==-1);
+  await wait(1300);state=await probe(frame);
+  check('scrub commits +10 s after one second idle',state.time===10);
+  check('Back on the compact bar reveals full controls',RiveTV.revealPlayback()===true);
+  await wait(200);state=await probe(frame);check('full controls follow the compact bar',state.visible&&!state.compact);
+  await press('down');await press('right',6);await press('ok');state=await probe(frame);
+  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Wyłączone,English,Polski');
+  await press('down');await press('ok');frame.contentWindow.postMessage({fixture:'cue'},'*');await wait(200);state=await probe(frame);
+  check('selected subtitle track is rendered by the overlay',state.modes.join()==='hidden,disabled'&&state.subtitle==='Hello world');
+  check('subtitle choice is remembered for next episodes',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='english');
+  check('Back closes the open panel first',RiveTV.revealPlayback()===true);await wait(200);
+  state=await probe(frame);check('closing a panel returns focus to its button',!state.panel&&state.focus==='tracks');
+  await press('right');await press('ok');await press('right');await press('ok');state=await probe(frame);
+  check('speed panel switches playback to 1.25x',state.panel==='speed'&&state.rate===1.25);
+  RiveTV.revealPlayback();await wait(200);await press('left',2);await press('ok');await press('down');await press('ok');
+  check('episodes panel opens the chosen episode',pushed==='/watch?type=tv&id=7&season=1&episode=2');
+  RiveTV.revealPlayback();await wait(200);
+  frame.contentWindow.postMessage({fixture:'time',time:1150},'*');await wait(2600);state=await probe(frame);
+  check('next episode panel opens at the outro with focus',state.panel==='nextp'&&state.focus==='go'&&state.nextTitle==='2Dragon');
+  check('site next button stays hidden under the overlay',panel().hidden);
+  await press('ok');check('OK on next episode uses the site action',overlayNext===1);
+  frame.remove();history.replaceState({},'', '/watch?type=tv&id=7&season=1&episode=2');props2.episode='2';
+  frame=await provider('plyr');state=await probe(frame);
+  check('Plyr controls are hidden under the overlay',state.overlay&&state.providerHidden&&state.videoVisible);
+  await press('up');await press('up');await press('right');await press('ok');await wait(200);state=await probe(frame);
+  check('Servers button hands the remote to site controls',RiveTVPlayback.hidden()===false&&state.hostHidden&&!state.providerHidden);
+  check('Back returns from site controls to the overlay',RiveTV.revealPlayback()===true&&RiveTVPlayback.hidden()===true);
+  frame.remove();history.replaceState({},'', '/watch?type=movie&id=45745');
+  frame=await provider('vidstack');state=await probe(frame);
+  check('Vidstack controls and custom overlays are hidden',state.overlay&&state.providerHidden&&state.videoVisible);
+  await press('down');state=await probe(frame);
+  check('movies have no episode buttons',state.rows.join()==='play,rewind,forward,volume,tracks,speed');
  } catch (error) {results.push('FAIL '+error.stack);}
  document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
 })();

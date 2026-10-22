@@ -9,6 +9,8 @@ allowed = {
     "/app/src/main/assets/tv-compat.js": ("app/src/main/assets/tv-compat.js", "text/javascript"),
     "/app/src/main/assets/tv-bootstrap.js": ("app/src/main/assets/tv-bootstrap.js", "text/javascript"),
     "/app/src/main/assets/tv-playback.js": ("app/src/main/assets/tv-playback.js", "text/javascript"),
+    "/app/src/main/assets/tv-player.js": ("app/src/main/assets/tv-player.js", "text/javascript"),
+    "/tests/playback-provider.html": ("tests/playback-provider.html", "text/html"),
     "/tests/playback.html": ("tests/playback.html", "text/html"),
     "/tests/ads.html": ("tests/ads.html", "text/html"),
     "/tests/ads-frame.html": ("tests/ads-frame.html", "text/html"),

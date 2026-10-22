@@ -14,7 +14,11 @@ Przycisk **Następny odcinek** działa także przy wyłączonym auto next. Strza
 
 Przejście korzysta z dostępności i akcji następnego odcinka w Quick Menu strony, także na granicy sezonów; wymaga danych czasu od odtwarzacza Direct lub ramki dostawcy. Adapter odczytuje aktualne propsy komponentu React, gdy przyciski Quick Menu nie są zamontowane. Przy braku dostępnej akcji nie pokazuje przycisku ani nie zgaduje numeru odcinka. Zmiana struktury strony może wymagać aktualizacji adaptera.
 
-Regresje: `scripts/test-playback.sh` — 33 kontroli preferencji, odliczania, pauzy, buforowania, anulowania, pilota, timera snu, końca serialu, aktualnego drzewa React i odrzucania spóźnionych komunikatów ramek.
+Regresje: `scripts/test-playback.sh` — 62 kontrole preferencji, odliczania, pauzy, buforowania, anulowania, pilota, timera snu, końca serialu, aktualnego drzewa React i odrzucania spóźnionych komunikatów ramek oraz wspólnego odtwarzacza (JW Player, Plyr, Vidstack).
+
+## Wspólny odtwarzacz
+
+`tv-player.js` działa w każdej ramce. Ramka z głównym `<video>` (największym, gotowym) ukrywa interfejs dostawcy i rysuje własną nakładkę w Shadow DOM: tytuł, pasek postępu z podglądem, pauza, ±10 s, głośność, odcinki, audio i napisy, prędkość, następny odcinek, ekran pauzy, buforowanie i błąd. Klawisze pilota trafiają do niej komunikatami `riveTV:'key'` z numerem sekwencji, bo niektóre strony dostawców przekazują komunikaty dalej po kilka razy. Przycisk Serwery (lub Menu → Serwery) oddaje pilota kontrolkom strony; Wstecz wraca do nakładki. Dane odcinków pochodzą z aktualnego stanu React strony. Czcionka: `https://rivetv.assets/fonts/Inter-Variable.woff2` z zapasową bezszeryfową.
 
 Lokalna aplikacja APK do obsługi **https://www.rivestream.app/** pilotem telewizora. Ma menu TV, zaznaczanie kafelków strzałkami, wyszukiwanie klawiaturą ekranową z jej systemowym dyktowaniem, listy wyboru dostosowane do pilota, pełny ekran odtwarzacza oraz przełączany kursor do osadzonych odtwarzaczy. Podczas oglądania menu boczne chowa się automatycznie. Historia, ustawienia strony i sesja są zapisywane w prywatnym WebView aplikacji.
 

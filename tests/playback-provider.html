@@ -1,0 +1,39 @@
+<!doctype html><html><head><style>html,body{margin:0;height:100%;background:#000}video{width:100vw;height:100vh;display:block}#provider-ui{position:absolute;left:0;right:0;bottom:0;height:60px;background:#333;color:#fff}</style></head><body>
+<script>
+var kind=location.hash.slice(1)||'jw';
+var layouts={
+ jw:'<div class="jwplayer"><div class="jw-wrapper"><div class="jw-media"><video></video></div><div class="jw-controls" id="provider-ui"><div class="jw-controlbar">JW controls</div></div><div class="jw-captions"></div></div></div>',
+ plyr:'<div class="plyr"><div class="plyr__video-wrapper"><video></video></div><div class="plyr__controls" id="provider-ui"><button>Plyr play</button></div><button class="plyr__control--overlaid">Play</button></div>',
+ vidstack:'<media-player><media-provider><video></video></media-provider><div data-media-controls id="provider-ui"><button>Vidstack play</button></div></media-player><div class="custom-ad" style="position:fixed;inset:0;z-index:5">Custom overlay</div>'
+};
+document.body.innerHTML=layouts[kind];
+var video=document.querySelector('video'),time=0,paused=true;
+Object.defineProperties(video,{
+ currentTime:{get:()=>time,set:v=>{time=v;video.dispatchEvent(new Event('seeked'));}},duration:{get:()=>1200},
+ readyState:{get:()=>4},paused:{get:()=>paused},ended:{get:()=>false}
+});
+video.play=function(){paused=false;video.dispatchEvent(new Event('play'));video.dispatchEvent(new Event('playing'));return Promise.resolve();};
+video.pause=function(){paused=true;video.dispatchEvent(new Event('pause'));};
+var english=video.addTextTrack('subtitles','English','en'),polish=video.addTextTrack('subtitles','Polski','pl');
+window.addEventListener('message',function(e){
+ if(e.source!==parent||!e.data||!e.data.fixture)return;
+ if(e.data.fixture==='time'){time=e.data.time;video.dispatchEvent(new Event('seeked'));}
+ if(e.data.fixture==='cue'){Object.defineProperty(english,'activeCues',{configurable:true,get:()=>[{text:'Hello <i>world</i>'}]});english.dispatchEvent(new Event('cuechange'));}
+ if(e.data.fixture==='probe'){
+  var host=document.getElementById('rive-player'),root=host&&host.shadowRoot,ui=document.getElementById('provider-ui');
+  var focused=root&&root.querySelector('.f'),open=root&&root.querySelector('.panel.open'),chrome=root&&root.querySelector('.chrome');
+  var hiddenStyle=getComputedStyle(ui);
+  parent.postMessage({fixture:'probe',time:time,paused:paused,rate:video.playbackRate,overlay:!!root,hostHidden:!!(host&&host.hidden),
+   providerHidden:hiddenStyle.visibility==='hidden'||hiddenStyle.opacity==='0',
+   videoVisible:getComputedStyle(video).visibility==='visible',controls:video.controls,
+   visible:!!chrome&&chrome.classList.contains('on'),compact:!!chrome&&chrome.classList.contains('compact'),
+   focus:focused?(focused.getAttribute('data-f')||focused.getAttribute('data-p')||focused.className):null,
+   panel:open?open.className.replace(/\bpanel\b|\bopen\b/g,'').trim():null,
+   items:root?Array.prototype.map.call(root.querySelectorAll('.col+.col .it'),x=>x.textContent):[],
+   modes:[english.mode,polish.mode],subtitle:root?root.querySelector('.sub span').textContent:'',
+   nextLabel:root?root.querySelector('[data-p="go"] span').textContent:'',nextTitle:root?root.querySelector('.nextp .num').textContent:'',
+   rows:root?Array.prototype.filter.call(root.querySelectorAll('.row [data-f]'),x=>x.style.display!=='none').map(x=>x.getAttribute('data-f')):[]},'*');
+ }
+});
+</script>
+<script src="/app/src/main/assets/tv-playback.js"></script><script src="/app/src/main/assets/tv-player.js"></script></body></html>
