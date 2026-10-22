@@ -275,6 +275,7 @@
       loadPreferences();nextPreferences.subtitles = value;persistPreferences();
     },
     conceal:function () {if (!controls) return false;setControls(false);return true;},
+    state:function () {return nextState;},
     flush:function () {document.querySelectorAll('video').forEach(report);sendChildren({riveTV:'command',action:'pause'});}
   };
   // Own the end transition so the site's unconditional auto-next cannot bypass

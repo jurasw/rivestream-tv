@@ -190,7 +190,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));
             refreshStorageBootstrap();
         }
-        navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js");
+        navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js")+"\n"+readAsset("tv-shell.js")+"\n"+readAsset("tv-servers.js");
         web.setOnFocusChangeListener((v,focus)->{if(focus)setRailExpanded(false);else stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
         cursor=new CursorView();
         cursor.setVisibility(View.GONE);
@@ -198,15 +198,24 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         loading=new LinearLayout(this);
         loading.setOrientation(LinearLayout.VERTICAL);
         loading.setGravity(Gravity.CENTER);
-        loading.setBackgroundColor(0xff141414);
-        ImageView loadingMark=new ImageView(this);loadingMark.setImageResource(R.drawable.rive_mark);
-        loading.addView(loadingMark,new LinearLayout.LayoutParams(dp(56),dp(56)));
+        GradientDrawable glow=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xff2a0f22,0xff120b14,0xff0a0a0a});
+        glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);glow.setGradientRadius(dp(420));glow.setGradientCenter(.5f,.42f);
+        loading.setBackground(glow);
+        FrameLayout loader=new FrameLayout(this);
         progress=new SpinnerView();
-        LinearLayout.LayoutParams spinnerParams=new LinearLayout.LayoutParams(dp(48),dp(48));spinnerParams.topMargin=dp(28);
-        loading.addView(progress,spinnerParams);
-        status=label("Łączenie z Rivestream…",12,0xffd2d2d2);
-        status.setGravity(Gravity.CENTER);
-        status.setPadding(dp(24),dp(20),dp(24),dp(16));
+        loader.addView(progress,new FrameLayout.LayoutParams(dp(104),dp(104),Gravity.CENTER));
+        ImageView loadingMark=new ImageView(this);loadingMark.setImageResource(R.drawable.rive_mark);
+        loader.addView(loadingMark,new FrameLayout.LayoutParams(dp(52),dp(52),Gravity.CENTER));
+        ObjectAnimator breathe=ObjectAnimator.ofPropertyValuesHolder(loadingMark,android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X,1f,.9f),android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y,1f,.9f));
+        breathe.setDuration(1100);breathe.setRepeatCount(ValueAnimator.INFINITE);breathe.setRepeatMode(ValueAnimator.REVERSE);breathe.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());breathe.start();
+        loading.addView(loader,new LinearLayout.LayoutParams(dp(104),dp(104)));
+        TextView wordmark=label("rive",30,Color.WHITE);wordmark.setTypeface(interBold);wordmark.setLetterSpacing(-.02f);
+        wordmark.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->wordmark.getPaint().setShader(new android.graphics.LinearGradient(0,0,r-l,0,new int[]{0xfff69b65,0xffed5c91,0xffef009d},null,android.graphics.Shader.TileMode.CLAMP)));
+        LinearLayout.LayoutParams wordmarkParams=new LinearLayout.LayoutParams(-2,-2);wordmarkParams.topMargin=dp(18);
+        loading.addView(wordmark,wordmarkParams);
+        status=label("Łączenie z Rivestream…",12,0xff9a9a9a);
+        status.setGravity(Gravity.CENTER);status.setLetterSpacing(.04f);
+        status.setPadding(dp(24),dp(6),dp(24),dp(16));
         loading.addView(status);
         Button retry=makeButton("Odśwież");
         retry.setOnClickListener(v->web.reload());
@@ -344,9 +353,10 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         boolean watch="/watch".equals(path);
         if(watchQuick!=null)watchQuick.setVisibility(watch && pageFailed?View.VISIBLE:View.GONE);
         if(errorPlayback!=null)errorPlayback.setVisibility(watch?View.VISIBLE:View.GONE);
-        rail.setVisibility(watch?View.GONE:View.VISIBLE);
+        boolean shell=java.util.Arrays.asList("/","/movie","/tv","/library","/search","/detail").contains(path==null||path.isEmpty()?"/":path);
+        rail.setVisibility(watch||shell?View.GONE:View.VISIBLE);
         FrameLayout.LayoutParams contentParams=(FrameLayout.LayoutParams)content.getLayoutParams();
-        int margin=watch?0:dp(84);if(contentParams.leftMargin!=margin){contentParams.leftMargin=margin;content.setLayoutParams(contentParams);}
+        int margin=watch||shell?0:dp(84);if(contentParams.leftMargin!=margin){contentParams.leftMargin=margin;content.setLayoutParams(contentParams);}
         if(watch)web.requestFocus();
         String[] paths={"/","/search","/movie","/tv","/library","/settings"};
         for(int i=0;i<navButtons.size();i++)navButtons.get(i).setSelected(paths[i].equals(path));
@@ -459,7 +469,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private void monitorPageError(int generation){
         handler.postDelayed(()->{
             if(web==null || generation!=pageGeneration || pageFailed)return;
-            String stateScript=sourceError ? "window.RiveTV ? (Array.from(document.querySelectorAll('iframe')).some(f=>/^https:\\/\\/primesrc\\.me\\//.test(f.src)) ? RiveTV.pageState() : 'source-changed') : 'loading'" : "window.RiveTV ? RiveTV.pageState() : 'loading'";
+            String stateScript=sourceError ? "window.RiveTV ? (window.RiveTVPlayer && RiveTVPlayer.active() ? 'source-changed' : Array.from(document.querySelectorAll('iframe')).some(f=>/^https:\\/\\/primesrc\\.me\\//.test(f.src)) ? RiveTV.pageState() : 'source-changed') : 'loading'" : "window.RiveTV ? RiveTV.pageState() : 'loading'";
             web.evaluateJavascript(stateScript,result->{
                 if(web==null || generation!=pageGeneration || pageFailed)return;
                 if("\"source-changed\"".equals(result)){sourceError=false;watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);}
@@ -497,6 +507,10 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         },250);
     }
     private void showSourceError(){
+        if(web==null || pageFailed || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
+        web.evaluateJavascript("!!(window.RiveTVServers && RiveTVServers.searching())",result->{if(!"true".equals(result))revealSourceError();});
+    }
+    private void revealSourceError(){
         if(web==null || pageFailed || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
         sourceError=true;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.VISIBLE);errorRetry.setText(R.string.source_servers);
         errorText.setText(R.string.source_blocked);
@@ -918,7 +932,17 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         finishBack();
     }
     private void finishBack(){
-        if(web!=null && web.canGoBack()){web.goBack();return;}
+        Uri current=web==null || web.getUrl()==null?null:Uri.parse(web.getUrl());
+        String path=current==null?null:current.getPath();
+        if(current!=null && isRive(current) && path!=null && !path.isEmpty() && !"/".equals(path)){
+            android.webkit.WebBackForwardList list=web.copyBackForwardList();
+            for(int i=list.getCurrentIndex()-1;i>=0;i--){
+                Uri entry=Uri.parse(list.getItemAtIndex(i).getUrl());
+                if(isRive(entry) && !"/watch".equals(entry.getPath())){web.goBackOrForward(i-list.getCurrentIndex());return;}
+            }
+            hideFullscreen();web.loadUrl(HOME);return;
+        }
+        if(current!=null && !isRive(current) && web.canGoBack()){web.goBack();return;}
         showTvDialog("Kończysz oglądanie?","Możesz wrócić do Rivestream w dowolnej chwili.",new String[]{"Zostań","Zamknij aplikację"},new Runnable[]{null,()->finish()},false);
     }
     @Override public void onBackPressed(){goBack();}
@@ -929,14 +953,16 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private final class SpinnerView extends View{
         final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF arc=new RectF();
         final ObjectAnimator spin=ObjectAnimator.ofFloat(this,View.ROTATION,0f,360f);
-        SpinnerView(){super(MainActivity.this);setFocusable(false);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(4));p.setStrokeCap(Paint.Cap.ROUND);
-            spin.setDuration(1000);spin.setRepeatCount(ValueAnimator.INFINITE);spin.setInterpolator(new LinearInterpolator());}
+        android.graphics.Shader sweep;
+        SpinnerView(){super(MainActivity.this);setFocusable(false);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(3));p.setStrokeCap(Paint.Cap.ROUND);
+            spin.setDuration(1200);spin.setRepeatCount(ValueAnimator.INFINITE);spin.setInterpolator(new LinearInterpolator());}
         @Override public void onVisibilityAggregated(boolean visible){super.onVisibilityAggregated(visible);if(visible){if(!spin.isStarted())spin.start();}else spin.cancel();}
         @Override protected void onDetachedFromWindow(){spin.cancel();super.onDetachedFromWindow();}
         @Override protected void onDraw(Canvas c){
             float inset=dp(2);arc.set(inset,inset,getWidth()-inset,getHeight()-inset);
-            p.setColor(0x26ffffff);c.drawOval(arc,p);
-            p.setColor(0xffe50914);c.drawArc(arc,-90,90,false,p);
+            p.setShader(null);p.setColor(0x1affffff);c.drawOval(arc,p);
+            if(sweep==null)sweep=new android.graphics.SweepGradient(getWidth()/2f,getHeight()/2f,new int[]{0x00f69b65,0xfff69b65,0xffed5c91,0xffef009d,0x00ef009d},new float[]{0f,.15f,.5f,.8f,1f});
+            p.setShader(sweep);p.setColor(Color.WHITE);c.drawArc(arc,0,300,false,p);p.setShader(null);
         }
     }
     private final class CursorView extends View{
