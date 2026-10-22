@@ -2,7 +2,9 @@ package app.rivestream.tv;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.view.animation.LinearInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
@@ -14,9 +16,12 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -38,7 +43,10 @@ import android.webkit.JsResult;
 import android.webkit.JsPromptResult;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
+import android.webkit.ServiceWorkerClient;
+import android.webkit.ServiceWorkerController;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
@@ -47,19 +55,25 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ImageView;
 import android.widget.ScrollView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.text.Editable;
 import android.text.TextWatcher;
 import org.json.JSONObject;
 import org.json.JSONArray;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 
 /** A small TV browser dedicated to Rivestream; no scraping or private API dependency. */
 public final class MainActivity extends Activity implements AppUpdater.Host {
     private static final String HOME = "https://www.rivestream.app/";
+    static final String[] AD_HOSTS={"adsco.re","cdn4ads.com","llvpn.com","luugy.com","rtmark.net","rapidadexchange.com","adexchangerapid.com","usrpubtrck.com","usrpubtrk.com","intellipopup.com","histats.com","predictivdisplay.com","trackzonas.com","rlsredirect.com","misradstore.com","panterlorius.com","cokedpariti.com","unlaxguttus.com","urbanfungose.com","mc.yandex.ru","mc.yandex.com","clarity.ms"};
+    static boolean adHost(String host){if(host==null)return false;host=host.toLowerCase(java.util.Locale.ROOT);for(String ad:AD_HOSTS)if(host.equals(ad)||host.endsWith("."+ad))return true;return false;}
+    private static final String ASSET_HOST = "rivetv.assets";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ArrayList<Button> navButtons = new ArrayList<>();
     private WebView web;
@@ -69,12 +83,15 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private TextView brand;
     private Button controls;
     private boolean railExpanded=true;
-    private ProgressBar progress;
+    private SpinnerView progress;
+    private Typeface interRegular, interMedium, interBold;
     private TextView status;
     private CursorView cursor;
     private View customView;
     private WebChromeClient.CustomViewCallback customCallback;
     private String navigationScript, bootstrapScript, compatibilityScript;
+    private ViewingStore viewingStore;
+    private androidx.webkit.ScriptHandler storageBootstrap;
     private ValueAnimator railAnimator;
     private float railReveal=1f;
     private int pageGeneration;
@@ -88,7 +105,12 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private LinearLayout errorBar;
     private Button errorRetry, watchQuick;
     private LinearLayout errorPlayback;
+    private Button errorCursor;
     private boolean sourceError;
+    private String captchaKind;
+    private float captchaX=.5f,captchaY=.5f;
+    private long lastBlockNotice;
+    private final HashSet<String> captchaServers=new HashSet<>();
     private int heldArrow, arrowGeneration;
     private boolean arrowInFlight, arrowRepeated, centerPressedHere, keyboardRequested;
     private long suppressCenterUntil;
@@ -101,20 +123,23 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         immersive();
+        interRegular=getResources().getFont(R.font.inter);
+        interMedium=Typeface.create(interRegular,500,false);
+        interBold=Typeface.create(interRegular,700,false);
         root = new FrameLayout(this);
-        root.setBackgroundColor(0xff1b1919);
+        root.setBackgroundColor(0xff141414);
         FrameLayout layout = new FrameLayout(this);
         root.addView(layout, new FrameLayout.LayoutParams(-1,-1));
         rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setPadding(dp(14),dp(28),dp(14),dp(18));
-        rail.setBackgroundColor(0xff151313);
+        rail.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xff000000,0xff141414}));
         rail.setClipChildren(true);
         identity=new LinearLayout(this);identity.setGravity(Gravity.CENTER_VERTICAL);identity.setPadding(dp(14),0,0,0);
         ImageView mark=new ImageView(this);mark.setImageResource(R.drawable.rive_mark);
         identity.addView(mark,new LinearLayout.LayoutParams(dp(28),dp(28)));
         brand=label("RIVESTREAM",16,Color.WHITE);
-        brand.setTypeface(Typeface.create("sans-serif-condensed",Typeface.BOLD));brand.setLetterSpacing(.055f);
+        brand.setTypeface(interBold);brand.setLetterSpacing(.02f);brand.setTextSize(14);brand.setSingleLine(true);
         brand.setPadding(dp(7),0,0,0);identity.addView(brand);
         LinearLayout.LayoutParams identityParams=new LinearLayout.LayoutParams(dp(152),dp(28));identityParams.bottomMargin=dp(40);rail.addView(identity,identityParams);
         addNav("Start", "");
@@ -134,7 +159,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         layout.addView(content,contentParams);
         layout.addView(rail,new FrameLayout.LayoutParams(dp(180),-1));
         web=new TvWebView();
-        web.setBackgroundColor(0xff1b1919);
+        web.setBackgroundColor(0xff141414);
         content.addView(web,new FrameLayout.LayoutParams(-1,-1));
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
@@ -153,12 +178,17 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web,true);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        viewingStore=new ViewingStore(this);
+        if(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)){
+            WebViewCompat.addWebMessageListener(web,"RiveTVStorage",new HashSet<>(Arrays.asList("https://www.rivestream.app","https://rivestream.app")),
+                (view,message,origin,mainFrame,reply)->{if(mainFrame){viewingStore.accept(message.getData());refreshStorageBootstrap();}});
+        }
         bootstrapScript=readAsset("tv-bootstrap.js");
-        compatibilityScript=readAsset("tv-compat.js");
+        compatibilityScript=readAsset("tv-compat.js")+"\n"+readAsset("tv-playback.js")+"\n"+readAsset("tv-player.js")+"\n"+readAsset("tv-ads.js");
         if(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)){
             documentStartSupported=true;
             WebViewCompat.addDocumentStartJavaScript(web,compatibilityScript,new HashSet<>(Arrays.asList("*")));
-            WebViewCompat.addDocumentStartJavaScript(web,bootstrapScript,new HashSet<>(Arrays.asList("https://www.rivestream.app","https://rivestream.app")));
+            refreshStorageBootstrap();
         }
         navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js");
         web.setOnFocusChangeListener((v,focus)->{if(focus)setRailExpanded(false);else stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
@@ -168,60 +198,70 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         loading=new LinearLayout(this);
         loading.setOrientation(LinearLayout.VERTICAL);
         loading.setGravity(Gravity.CENTER);
-        loading.setBackgroundColor(0xff1b1919);
+        loading.setBackgroundColor(0xff141414);
         ImageView loadingMark=new ImageView(this);loadingMark.setImageResource(R.drawable.rive_mark);
-        loading.addView(loadingMark,new LinearLayout.LayoutParams(dp(64),dp(78)));
-        progress=new ProgressBar(this);
-        progress.setIndeterminateTintList(ColorStateList.valueOf(0xffffd166));
-        LinearLayout.LayoutParams spinnerParams=new LinearLayout.LayoutParams(dp(28),dp(28));spinnerParams.topMargin=dp(24);
+        loading.addView(loadingMark,new LinearLayout.LayoutParams(dp(56),dp(56)));
+        progress=new SpinnerView();
+        LinearLayout.LayoutParams spinnerParams=new LinearLayout.LayoutParams(dp(48),dp(48));spinnerParams.topMargin=dp(28);
         loading.addView(progress,spinnerParams);
-        status=label("Łączenie z Rivestream…",18,Color.WHITE);
+        status=label("Łączenie z Rivestream…",12,0xffd2d2d2);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(dp(24),dp(24),dp(24),dp(16));
+        status.setPadding(dp(24),dp(20),dp(24),dp(16));
         loading.addView(status);
         Button retry=makeButton("Odśwież");
         retry.setOnClickListener(v->web.reload());
         retry.setVisibility(View.GONE);
-        loading.addView(retry,new LinearLayout.LayoutParams(dp(180),dp(44)));
+        loading.addView(retry,new LinearLayout.LayoutParams(dp(140),dp(32)));
         content.addView(loading,new FrameLayout.LayoutParams(-1,-1));
         errorBar=new LinearLayout(this);errorBar.setGravity(Gravity.CENTER_VERTICAL);
-        errorBar.setPadding(dp(14),dp(8),dp(10),dp(8));errorBar.setBackground(panelBackground(0xff1f1c1c,8));errorBar.setElevation(dp(8));
-        errorText=label("",13,Color.WHITE);errorText.setMaxLines(2);errorText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        errorBar.setPadding(dp(18),dp(8),dp(10),dp(8));errorBar.setBackground(errorBackground());errorBar.setElevation(dp(8));
+        errorText=label("",12,Color.WHITE);errorText.setMaxLines(2);errorText.setEllipsize(android.text.TextUtils.TruncateAt.END);
         errorBar.addView(errorText,new LinearLayout.LayoutParams(0,-2,1));
-        errorRetry=makeButton("Odśwież");errorRetry.setOnClickListener(v->{web.requestFocus();if(sourceError){sourceError=false;watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);});}else web.reload();});
-        errorRetry.setBackgroundResource(R.drawable.action_background);errorRetry.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams retryParams=new LinearLayout.LayoutParams(dp(105),dp(38));retryParams.leftMargin=dp(8);errorBar.addView(errorRetry,retryParams);
-        Button dismissError=makeButton("Zamknij");dismissError.setBackgroundResource(R.drawable.action_background);dismissError.setGravity(Gravity.CENTER);dismissError.setOnClickListener(v->{errorBar.setVisibility(View.GONE);if(!pageFailed)watchQuick.setVisibility(View.GONE);web.requestFocus();});
-        LinearLayout.LayoutParams dismissParams=new LinearLayout.LayoutParams(dp(95),dp(38));dismissParams.leftMargin=dp(8);errorBar.addView(dismissError,dismissParams);
+        errorRetry=makeButton("Odśwież");errorRetry.setOnClickListener(v->{web.requestFocus();if(sourceError){sourceError=false;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);});}else web.reload();});
+        LinearLayout.LayoutParams retryParams=new LinearLayout.LayoutParams(dp(105),dp(32));retryParams.leftMargin=dp(8);errorBar.addView(errorRetry,retryParams);
+        Button dismissError=makeButton("Zamknij");dismissError.setOnClickListener(v->{errorBar.setVisibility(View.GONE);if(!pageFailed)watchQuick.setVisibility(View.GONE);web.requestFocus();});
+        LinearLayout.LayoutParams dismissParams=new LinearLayout.LayoutParams(dp(95),dp(32));dismissParams.leftMargin=dp(8);errorBar.addView(dismissError,dismissParams);
         View.OnKeyListener errorKeys=(v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_DOWN){if(event.getAction()==KeyEvent.ACTION_DOWN)web.requestFocus();return true;}return false;};
         errorRetry.setOnKeyListener(errorKeys);dismissError.setOnKeyListener(errorKeys);
         errorBar.setVisibility(View.GONE);
-        FrameLayout.LayoutParams errorParams=new FrameLayout.LayoutParams(-1,dp(60),Gravity.TOP);errorParams.setMargins(dp(16),dp(10),dp(16),0);
+        FrameLayout.LayoutParams errorParams=new FrameLayout.LayoutParams(-1,dp(52),Gravity.TOP);errorParams.setMargins(dp(16),dp(10),dp(16),0);
         content.addView(errorBar,errorParams);
         errorPlayback=new LinearLayout(this);errorPlayback.setGravity(Gravity.CENTER_VERTICAL);
         for(String mode:new String[]{"direct","embed"}){
-            Button button=makeButton("direct".equals(mode)?"Direct":"Embed");button.setBackgroundResource(R.drawable.action_background);button.setGravity(Gravity.CENTER);
+            Button button=makeButton("direct".equals(mode)?"Direct":"Embed");
             button.setOnClickListener(v->setPlaybackMode(mode));button.setOnKeyListener(errorKeys);
-            LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(dp(88),dp(38));modeParams.leftMargin=dp(8);errorPlayback.addView(button,modeParams);
+            LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(dp(88),dp(32));modeParams.leftMargin=dp(8);errorPlayback.addView(button,modeParams);
         }
         errorBar.addView(errorPlayback,1,new LinearLayout.LayoutParams(-2,-2));errorPlayback.setVisibility(View.GONE);
-        watchQuick=makeButton("⋮");watchQuick.setBackgroundResource(R.drawable.action_background);watchQuick.setGravity(Gravity.CENTER);watchQuick.setContentDescription("Opcje odtwarzania");watchQuick.setOnClickListener(v->showMenu());
+        errorCursor=makeButton("Kursor");errorCursor.setOnKeyListener(errorKeys);
+        errorCursor.setOnClickListener(v->{if(!pointerMode)togglePointer();cursor.x=captchaX*web.getWidth();cursor.y=captchaY*web.getHeight();cursor.invalidate();web.requestFocus();});
+        LinearLayout.LayoutParams cursorParams=new LinearLayout.LayoutParams(dp(95),dp(32));cursorParams.leftMargin=dp(8);errorBar.addView(errorCursor,2,cursorParams);errorCursor.setVisibility(View.GONE);
+        watchQuick=makeButton("⋮");watchQuick.setBackgroundResource(R.drawable.circle_button);watchQuick.setTextSize(18);watchQuick.setPadding(0,0,0,0);watchQuick.setTextColor(Color.WHITE);watchQuick.setContentDescription("Opcje odtwarzania");watchQuick.setOnClickListener(v->showMenu());
         watchQuick.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_LEFT){if(event.getAction()==KeyEvent.ACTION_DOWN)web.requestFocus();return true;}return false;});
         FrameLayout.LayoutParams quickParams=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT|Gravity.BOTTOM);quickParams.rightMargin=dp(12);quickParams.bottomMargin=dp(12);
         watchQuick.setVisibility(View.GONE);content.addView(watchQuick,quickParams);
-        notice=label("",13,Color.WHITE);notice.setGravity(Gravity.CENTER);
-        notice.setPadding(dp(22),dp(14),dp(22),dp(14));notice.setBackground(panelBackground(0xff252525,6));notice.setVisibility(View.GONE);
+        notice=label("",12,Color.WHITE);notice.setGravity(Gravity.CENTER);
+        notice.setPadding(dp(22),dp(12),dp(22),dp(12));notice.setBackground(panelBackground(0xff262626,3));notice.setElevation(dp(8));notice.setVisibility(View.GONE);
         FrameLayout.LayoutParams noticeParams=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
         noticeParams.bottomMargin=dp(28);root.addView(notice,noticeParams);
+        ServiceWorkerController.getInstance().setServiceWorkerClient(new ServiceWorkerClient(){
+            @Override public WebResourceResponse shouldInterceptRequest(WebResourceRequest request){return assetResponse(request.getUrl());}
+        });
         web.setWebViewClient(new WebViewClient(){
             @Override public void onPageCommitVisible(WebView w,String url){
                 if(!pageFailed){if(isRive(Uri.parse(url)))injectNavigation(w);else loading.setVisibility(View.GONE);}
             }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView w,WebResourceRequest request){
+                WebResourceResponse asset=assetResponse(request.getUrl());if(asset!=null)return asset;
+                return adHost(request.getUrl().getHost())?new WebResourceResponse("text/plain","UTF-8",204,"No Content",null,new java.io.ByteArrayInputStream(new byte[0])):null;
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest request){
-                if(!request.isForMainFrame()) return false;
                 Uri uri=request.getUrl();
+                if(!request.isForMainFrame()) return adHost(uri.getHost());
                 if(isRive(uri)) return false;
-                if(request.hasGesture() && "https".equals(uri.getScheme())) {
+                String current=w.getUrl();
+                if(adHost(uri.getHost()) || !"https".equals(uri.getScheme()) || (current!=null && isRive(Uri.parse(current)) && "/watch".equals(Uri.parse(current).getPath()))){blockedNotice("Zablokowano przekierowanie reklamy.");return true;}
+                if(request.hasGesture()) {
                     showTvDialog("Link poza Rivestream",uri.getHost(),new String[]{"Anuluj","Otwórz"},new Runnable[]{null,()->web.loadUrl(uri.toString())},false);
                 }
                 return true;
@@ -229,7 +269,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             @Override public void onPageStarted(WebView w,String url,android.graphics.Bitmap icon){
                 updateNavigation(url);
                 beginLoading(url);
-                if(!documentStartSupported && isRive(Uri.parse(url)))w.evaluateJavascript(compatibilityScript+"\n"+bootstrapScript,null);
+                if(!documentStartSupported && isRive(Uri.parse(url)))w.evaluateJavascript(viewingStore.restoreScript()+compatibilityScript+"\n"+bootstrapScript,null);
             }
             @Override public void onPageFinished(WebView w,String url){
                 if(pageFailed) return;
@@ -260,8 +300,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 activeDialog.setOnCancelListener(d->result.cancel());return true;
             }
             @Override public boolean onJsPrompt(WebView view,String url,String message,String defaultValue,JsPromptResult result){
-                EditText input=new EditText(MainActivity.this);input.setSingleLine(true);input.setText(defaultValue);input.setTextColor(Color.WHITE);input.setTextSize(16);
-                GradientDrawable bg=panelBackground(0xff292929,4);bg.setStroke(dp(1),0xff666666);input.setBackground(bg);input.setPadding(dp(12),dp(10),dp(12),dp(10));
+                EditText input=new EditText(MainActivity.this);input.setSingleLine(true);input.setText(defaultValue);input.setTextColor(Color.WHITE);input.setTextSize(13);input.setTypeface(interRegular);input.setHintTextColor(0xff808080);
+                input.setBackground(inputBackground());input.setPadding(dp(11),dp(6),dp(16),dp(6));
                 showTvDialog("Wpisz odpowiedź",message,new String[]{"Anuluj","Zapisz"},new Runnable[]{result::cancel,()->result.confirm(input.getText().toString())},false,input);
                 activeDialog.setOnCancelListener(d->result.cancel());return true;
             }
@@ -274,7 +314,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 immersive();
             }
             @Override public void onHideCustomView(){hideFullscreen();}
-            @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean gesture,android.os.Message result){return false;}
+            @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean gesture,android.os.Message result){blockedNotice("Zablokowano wyskakujące okno.");return false;}
         });
         setContentView(root);
         web.requestFocus();
@@ -312,17 +352,21 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         for(int i=0;i<navButtons.size();i++)navButtons.get(i).setSelected(paths[i].equals(path));
     }
     private Button makeButton(String title){
-        return configureButton(new Button(this),title);
+        Button b=configureButton(new Button(this),title);
+        b.setBackgroundResource(R.drawable.action_background);b.setGravity(Gravity.CENTER);b.setTypeface(interMedium);b.setTextSize(12);
+        b.setLetterSpacing(.02f);b.setPadding(dp(14),0,dp(14),0);
+        b.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{}},new int[]{Color.BLACK,Color.WHITE}));
+        return b;
     }
     private Button configureButton(Button b,String title){
-        b.setText(title);b.setAllCaps(false);b.setSingleLine(true);b.setEllipsize(android.text.TextUtils.TruncateAt.END);b.setTextSize(13);
+        b.setText(title);b.setAllCaps(false);b.setSingleLine(true);b.setEllipsize(android.text.TextUtils.TruncateAt.END);b.setTextSize(12);
         b.setContentDescription(title);
-        b.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));b.setStateListAnimator(null);
+        b.setTypeface(interRegular);b.setStateListAnimator(null);
         b.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);b.setMinHeight(0);b.setMinimumHeight(0);
         b.setBackgroundResource(R.drawable.nav_background);
         b.setCompoundDrawableTintList(null);
         b.setPadding(dp(18),0,dp(12),0);
-        b.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{android.R.attr.state_selected},new int[]{}},new int[]{0xff1b1919,Color.WHITE,0xffababab}));
+        b.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{android.R.attr.state_selected},new int[]{}},new int[]{Color.WHITE,Color.WHITE,0xffe5e5e5}));
         b.setOnFocusChangeListener((v,focus)->{if(focus && navButtons.contains(b))lastNav=b;});
         return b;
     }
@@ -345,12 +389,25 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     /** Keep icons independent of TextView's drawable cache while labels change. */
     private final class RailButton extends Button{
         private final TvIconDrawable icon;
+        private final Paint underline=new Paint();
         RailButton(String path){super(MainActivity.this);icon=new TvIconDrawable(MainActivity.this,path);}
         @Override protected void onDraw(Canvas canvas){
             int layer=canvas.saveLayerAlpha(0,0,getWidth(),getHeight(),Math.round(255*railReveal));
-            super.onDraw(canvas);canvas.restoreToCount(layer);
+            super.onDraw(canvas);
+            if(isFocused()){
+                float width=Math.min(getPaint().measureText(getText().toString()),getWidth()-getTotalPaddingLeft()-getTotalPaddingRight());
+                float top=getBaseline()+dp(5);
+                underline.setColor(0xffe50914);
+                canvas.drawRect(getTotalPaddingLeft(),top,getTotalPaddingLeft()+width,top+dp(2),underline);
+            }
+            canvas.restoreToCount(layer);
             int size=dp(18),left=dp(19),top=(getHeight()-size)/2;
             icon.setBounds(left,top,left+size,top+size);icon.setState(getDrawableState());icon.draw(canvas);
+        }
+        @Override protected void drawableStateChanged(){
+            super.drawableStateChanged();
+            Typeface face=isFocused()||isSelected()?interMedium:interRegular;
+            if(getTypeface()!=face)setTypeface(face);
         }
     }
     private void attachRailKeys(Button b){
@@ -362,18 +419,42 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             }return false;
         });
     }
-    private TextView label(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);return t;}
+    private TextView label(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setTypeface(interRegular);return t;}
     private void beginLoading(String url){
         if(searchEditor!=null)finishKeyboardEditing();
         stopArrowNavigation();arrowGeneration++;
         errorBar.setVisibility(View.GONE);
-        sourceError=false;watchQuick.setVisibility(View.GONE);loadingUrl=url;pageFailed=false;pageGeneration++;loadingStarted=SystemClock.uptimeMillis();
+        sourceError=false;captchaKind=null;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);loadingUrl=url;pageFailed=false;pageGeneration++;loadingStarted=SystemClock.uptimeMillis();
         loading.animate().cancel();loading.setAlpha(1f);
         progress.setVisibility(View.VISIBLE);
         status.setText("/watch".equals(Uri.parse(url).getPath())?"Przygotowuję odtwarzacz…":"Ładuję Twoje kino…");
         loading.getChildAt(loading.getChildCount()-1).setVisibility(View.GONE);
         loading.setVisibility(View.VISIBLE);
-        if(isRive(Uri.parse(url)))pollPageReady(pageGeneration);
+        if(isRive(Uri.parse(url))){pollPageReady(pageGeneration);monitorCaptcha(pageGeneration);}
+    }
+    private void monitorCaptcha(int generation){
+        handler.postDelayed(()->{
+            if(web==null || generation!=pageGeneration)return;
+            web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.captcha() : null",result->{
+                if(web==null || generation!=pageGeneration)return;
+                JSONObject found=null;
+                try{Object value=new org.json.JSONTokener(result).nextValue();if(value instanceof String)found=new JSONObject((String)value);}catch(Exception ignored){}
+                if(found!=null){captchaX=(float)found.optDouble("x",.5);captchaY=(float)found.optDouble("y",.5);if(captchaKind==null)showCaptcha(found.optString("kind","Cloudflare"),found.optString("server"));}
+                else if(captchaKind!=null){captchaKind=null;if(sourceError && errorCursor.getVisibility()==View.VISIBLE){sourceError=false;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);}}
+                monitorCaptcha(generation);
+            });
+        },1500);
+    }
+    private void showCaptcha(String kind,String server){
+        if(web==null || pageFailed || web.getUrl()==null || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
+        captchaKind=kind;if(!server.isEmpty())captchaServers.add(server);
+        sourceError=true;errorRetry.setText(R.string.source_servers);errorCursor.setVisibility(View.VISIBLE);watchQuick.setVisibility(View.VISIBLE);
+        errorText.setText(getString(R.string.source_captcha,kind));errorBar.setVisibility(View.VISIBLE);
+        if(customView==null && activeDialog==null && !keyboardOpen()){stopArrowNavigation();errorCursor.requestFocus();}
+    }
+    private void blockedNotice(String message){
+        long now=SystemClock.uptimeMillis();if(now-lastBlockNotice<8000)return;
+        lastBlockNotice=now;showNotice(message);
     }
     private void monitorPageError(int generation){
         handler.postDelayed(()->{
@@ -388,7 +469,13 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         },1500);
     }
     private void injectNavigation(WebView view){
-        view.evaluateJavascript(navigationScript,result->{if(web!=null)syncWebFocus(web.hasFocus() && !pointerMode && activeDialog==null);});
+        view.evaluateJavascript(viewingStore.restoreScript()+navigationScript,result->{if(web!=null)syncWebFocus(web.hasFocus() && !pointerMode && activeDialog==null);});
+    }
+    private void refreshStorageBootstrap(){
+        if(!documentStartSupported || web==null || bootstrapScript==null)return;
+        if(storageBootstrap!=null)storageBootstrap.remove();
+        storageBootstrap=WebViewCompat.addDocumentStartJavaScript(web,viewingStore.restoreScript()+bootstrapScript,
+            new HashSet<>(Arrays.asList("https://www.rivestream.app","https://rivestream.app")));
     }
     private void pollPageReady(int generation){
         handler.postDelayed(()->{
@@ -411,13 +498,13 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     }
     private void showSourceError(){
         if(web==null || pageFailed || !"/watch".equals(Uri.parse(web.getUrl()).getPath()))return;
-        sourceError=true;watchQuick.setVisibility(View.VISIBLE);errorRetry.setText(R.string.source_servers);
+        sourceError=true;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.VISIBLE);errorRetry.setText(R.string.source_servers);
         errorText.setText(R.string.source_blocked);
         errorBar.setVisibility(View.VISIBLE);
         if(customView==null && activeDialog==null && !keyboardOpen()){stopArrowNavigation();errorRetry.requestFocus();}
     }
     private void showError(String message){
-        sourceError=false;errorRetry.setText(R.string.error_refresh);
+        sourceError=false;errorCursor.setVisibility(View.GONE);errorRetry.setText(R.string.error_refresh);
         pageFailed=true;if(web!=null && web.getUrl()!=null && "/watch".equals(Uri.parse(web.getUrl()).getPath()))watchQuick.setVisibility(View.VISIBLE);loading.animate().cancel();loading.setVisibility(View.GONE);
         errorText.setText(message.replace('\n',' '));errorBar.setVisibility(View.VISIBLE);
         // Keep the page and playback controls usable; Up at the top enters this bar.
@@ -432,6 +519,35 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 else recoverPage(generation);
             });
         },1500);
+    }
+    private WebResourceResponse assetResponse(Uri uri){
+        if(!"https".equals(uri.getScheme()) || !ASSET_HOST.equals(uri.getHost()))return null;
+        Map<String,String> headers=new HashMap<>();
+        headers.put("Access-Control-Allow-Origin","*");
+        headers.put("Cache-Control","public, max-age=31536000, immutable");
+        String path=uri.getPath();
+        if(path!=null && path.matches("/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\\.[a-z0-9]+")){
+            String extension=path.substring(path.lastIndexOf('.')+1);
+            String mime;
+            switch(extension){
+                case "woff2": mime="font/woff2";break;
+                case "woff": mime="font/woff";break;
+                case "ttf": mime="font/ttf";break;
+                case "css": mime="text/css";break;
+                case "js": mime="text/javascript";break;
+                case "json": mime="application/json";break;
+                case "svg": mime="image/svg+xml";break;
+                case "png": mime="image/png";break;
+                case "webp": mime="image/webp";break;
+                case "txt": mime="text/plain";break;
+                default: mime=null;
+            }
+            if(mime!=null){
+                try{return new WebResourceResponse(mime,mime.startsWith("font/")||mime.startsWith("image/png")||mime.startsWith("image/webp")?null:"utf-8",200,"OK",headers,getAssets().open("rivetv"+path));}
+                catch(IOException ignored){}
+            }
+        }
+        return new WebResourceResponse("text/plain","utf-8",404,"Not Found",headers,new ByteArrayInputStream(new byte[0]));
     }
     private boolean isRive(Uri uri){String host=uri.getHost();return "https".equals(uri.getScheme()) && host!=null && (host.equals("rivestream.app") || host.endsWith(".rivestream.app"));}
     private String readAsset(String name){try(BufferedReader reader=new BufferedReader(new InputStreamReader(getAssets().open(name)))){StringBuilder s=new StringBuilder();String l;while((l=reader.readLine())!=null)s.append(l).append('\n');return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
@@ -465,7 +581,16 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         web.evaluateJavascript("localStorage.setItem('RiveStreamWatchMode',"+JSONObject.quote(mode)+");localStorage.setItem('RiveStreamEmbedMode','"+("embed".equals(mode)?"true":"false")+"');document.querySelectorAll('video,audio').forEach(function(v){v.pause();});",result->{if(web!=null){web.reload();web.requestFocus();}});
     }
     private void showPlaybackMenu(){
-        showTvDialog("Odtwarzanie","Wybierz tryb lub źródło",new String[]{"Direct","Embed","Serwery","Opcje aplikacji"},new Runnable[]{()->setPlaybackMode("direct"),()->setPlaybackMode("embed"),()->{if(pageFailed){setPlaybackMode("embed");}else web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);else showNotice("Wybór serwera pojawi się po wczytaniu odtwarzacza.");});},()->showAppMenu()},true);
+        showTvDialog("Odtwarzanie","Wybierz tryb lub źródło",new String[]{"Direct","Embed","Serwery","Zamknij reklamę","Opcje aplikacji"},new Runnable[]{()->setPlaybackMode("direct"),()->setPlaybackMode("embed"),()->{if(pageFailed){setPlaybackMode("embed");}else web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);else showNotice("Wybór serwera pojawi się po wczytaniu odtwarzacza.");});},this::dismissAds,()->showAppMenu()},true);
+    }
+    private void dismissAds(){
+        if(web==null)return;
+        web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.dismiss() : -1",before->handler.postDelayed(()->{
+            if(web!=null)web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.removed() : -1",after->{
+                web.requestFocus();
+                showNotice(!before.equals(after)?"Zamknięto wyskakujące okno.":"Nie znaleziono okna do zamknięcia. Włącz kursor (przytrzymaj OK) i kliknij X.");
+            });
+        },600));
     }
     private void showMenu(){
         if(web!=null && web.getUrl()!=null && "/watch".equals(Uri.parse(web.getUrl()).getPath())){showPlaybackMenu();return;}
@@ -507,8 +632,18 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         showTvDialog("Sterowanie pilotem","Strzałki — wybór elementów\nOK — otwórz / wybierz\nPrzytrzymaj OK — kursor w odtwarzaczu\nMenu lub F1 — opcje aplikacji\nWstecz — pełny ekran / poprzednia strona\nPlay / pauza — sterowanie dostępnym wideo\n\nGdy odtwarzacz nie reaguje na strzałki, włącz kursor.\n\nRivestream TV "+BuildConfig.VERSION_NAME+" · Android "+android.os.Build.VERSION.RELEASE+" · WebView "+version,new String[]{"Rozumiem"},new Runnable[]{null},false);
     }
     private GradientDrawable panelBackground(int color,int radius){GradientDrawable bg=new GradientDrawable();bg.setColor(color);bg.setCornerRadius(dp(radius));return bg;}
-    private void showNotice(String message){notice.setText(message);notice.setVisibility(View.VISIBLE);handler.removeCallbacks(hideNotice);handler.postDelayed(hideNotice,4000);}
-    private final Runnable hideNotice=()->{if(notice!=null)notice.setVisibility(View.GONE);};
+    private Drawable errorBackground(){
+        GradientDrawable stripe=new GradientDrawable();stripe.setColor(0xffe50914);stripe.setCornerRadii(new float[]{dp(3),dp(3),0,0,0,0,dp(3),dp(3)});
+        LayerDrawable layers=new LayerDrawable(new Drawable[]{panelBackground(0xff262626,3),stripe});
+        layers.setLayerWidth(1,dp(3));layers.setLayerGravity(1,Gravity.START|Gravity.FILL_VERTICAL);return layers;
+    }
+    private GradientDrawable inputBackground(){GradientDrawable bg=panelBackground(0x80000000,3);bg.setStroke(dp(1),Color.WHITE);return bg;}
+    private void showNotice(String message){
+        notice.setText(message);handler.removeCallbacks(hideNotice);handler.postDelayed(hideNotice,4000);
+        if(notice.getVisibility()!=View.VISIBLE){notice.setAlpha(0f);notice.setTranslationY(dp(6));notice.setVisibility(View.VISIBLE);}
+        notice.animate().cancel();notice.animate().alpha(1f).translationY(0).setDuration(200).setInterpolator(new DecelerateInterpolator()).withEndAction(null).start();
+    }
+    private final Runnable hideNotice=()->{if(notice!=null)notice.animate().alpha(0f).translationY(dp(6)).setDuration(150).withEndAction(()->notice.setVisibility(View.GONE)).start();};
     /** All app dialogs share the TV palette, focus treatment and predictable D-pad order. */
     private void showTvDialog(String title,String message,String[] actions,Runnable[] callbacks,boolean vertical){
         showTvDialog(title,message,actions,callbacks,vertical,null);
@@ -518,19 +653,27 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         final View previousFocus=getCurrentFocus();
         Dialog dialog=new Dialog(this);activeDialog=dialog;
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(28),dp(24),dp(28),dp(24));
-        GradientDrawable bg=panelBackground(0xff202020,8);bg.setStroke(dp(1),0xff383838);panel.setBackground(bg);
-        TextView eyebrow=label("RIVESTREAM",10,0xffffd166);eyebrow.setLetterSpacing(.18f);eyebrow.setTypeface(null,Typeface.BOLD);panel.addView(eyebrow);
-        TextView heading=label(title,24,Color.WHITE);heading.setTypeface(null,Typeface.BOLD);heading.setPadding(0,dp(10),0,dp(12));panel.addView(heading);
+        LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(32),dp(26),dp(32),dp(26));
+        panel.setBackground(panelBackground(vertical?0xff262626:0xff181818,3));
+        LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView mark=new ImageView(this);mark.setImageResource(R.drawable.rive_mark);header.addView(mark,new LinearLayout.LayoutParams(dp(18),dp(18)));
+        TextView heading=label(title,16,Color.WHITE);heading.setTypeface(interMedium);heading.setPadding(dp(10),0,0,0);heading.setSingleLine(true);heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout.LayoutParams headerParams=new LinearLayout.LayoutParams(-1,-2);headerParams.bottomMargin=dp(12);panel.addView(header,headerParams);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);
-        TextView description=label(message,14,0xffb3b3b3);description.setLineSpacing(dp(4),1);description.setPadding(0,0,0,dp(16));body.addView(description);
-        if(input!=null){LinearLayout.LayoutParams fieldParams=new LinearLayout.LayoutParams(-1,dp(46));fieldParams.bottomMargin=dp(16);body.addView(input,fieldParams);}
+        TextView description=label(message,12,0xffd2d2d2);description.setLineSpacing(dp(5),1);description.setPadding(0,0,0,dp(18));body.addView(description);
+        if(input!=null){LinearLayout.LayoutParams fieldParams=new LinearLayout.LayoutParams(-1,dp(38));fieldParams.bottomMargin=dp(18);body.addView(input,fieldParams);}
         LinearLayout buttons=new LinearLayout(this);buttons.setOrientation(vertical?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         for(int i=0;i<actions.length;i++){
-            final int index=i;Button b=makeButton(actions[i]);b.setTextSize(14);b.setPadding(dp(16),0,dp(16),0);
+            final int index=i;Button b=makeButton(actions[i]);
+            if(vertical){
+                boolean chosen=actions[i].startsWith("✓");
+                b.setBackgroundResource(R.drawable.list_item_background);b.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);b.setTypeface(chosen?interMedium:interRegular);b.setTextSize(13);b.setPadding(dp(16),0,dp(16),0);
+                b.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{}},new int[]{Color.WHITE,chosen?Color.WHITE:0xffb3b3b3}));
+            }
             b.setTag("rive-dialog-action-"+i);
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(vertical?-1:0,dp(42),vertical?0:1);if(vertical)lp.bottomMargin=dp(5);else if(i>0)lp.leftMargin=dp(10);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(vertical?-1:0,vertical?dp(37):dp(32),vertical?0:1);if(vertical)lp.bottomMargin=dp(3);else if(i>0)lp.leftMargin=dp(8);
             b.setOnClickListener(v->{dialog.dismiss();if(callbacks[index]!=null)callbacks[index].run();});buttons.addView(b,lp);
         }
         body.addView(buttons);scroll.addView(body);panel.addView(scroll,new LinearLayout.LayoutParams(-1,-2));
@@ -539,13 +682,15 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         dialog.show();
         android.view.Window window=dialog.getWindow();
         if(window!=null){
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams params=window.getAttributes();params.dimAmount=.82f;window.setAttributes(params);
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);window.setWindowAnimations(0);
+            WindowManager.LayoutParams params=window.getAttributes();params.dimAmount=.7f;window.setAttributes(params);
             int width=Math.min(dp(vertical?490:540),getResources().getDisplayMetrics().widthPixels-dp(64));
             panel.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
             int height=Math.min(panel.getMeasuredHeight(),getResources().getDisplayMetrics().heightPixels-dp(72));
             window.setLayout(width,height);window.getDecorView().setSystemUiVisibility(root.getSystemUiVisibility());
         }
+        panel.setAlpha(0f);panel.setScaleX(.9f);panel.setScaleY(.9f);
+        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(250).setInterpolator(new DecelerateInterpolator()).start();
         syncWebFocus(false);buttons.getChildAt(0).requestFocus();
     }
     private boolean keyboardOpen(){
@@ -560,11 +705,11 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         if(searchEditor!=null)return;
         stopArrowNavigation();
         EditText editor=new EditText(this);searchEditor=editor;
-        editor.setSingleLine(true);editor.setTextSize(16);editor.setTextColor(Color.WHITE);editor.setHintTextColor(0xffa3a3a3);
+        editor.setSingleLine(true);editor.setTextSize(13);editor.setTypeface(interRegular);editor.setTextColor(Color.WHITE);editor.setHintTextColor(0xff808080);
         editor.setHint("Wpisz tytuł filmu lub serialu");editor.setContentDescription("Wyszukaj tytuł");
         editor.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         editor.setImeOptions(EditorInfo.IME_ACTION_SEARCH|EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        GradientDrawable bg=panelBackground(0xff292929,4);bg.setStroke(dp(2),Color.WHITE);editor.setBackground(bg);editor.setPadding(dp(12),dp(8),dp(12),dp(8));
+        GradientDrawable bg=inputBackground();bg.setColor(0xff000000);bg.setStroke(dp(2),Color.WHITE);editor.setBackground(bg);editor.setPadding(dp(35),dp(6),dp(16),dp(6));
         editor.setText(target.optString("text"));editor.setSelection(editor.length());
         FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(Math.max(dp(180),(int)(target.optDouble("width",.8)*web.getWidth())),Math.max(dp(44),(int)(target.optDouble("height",.09)*web.getHeight())));
         params.leftMargin=(int)(target.optDouble("left")*web.getWidth());params.topMargin=(int)(target.optDouble("top")*web.getHeight());
@@ -663,7 +808,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         for(int i=0;i<options.length();i++){
             JSONObject option=options.optJSONObject(i);if(option==null || option.optBoolean("disabled"))continue;
             final int index=option.optInt("index");if(option.optBoolean("selected"))selectedIndex=labels.size();
-            labels.add((option.optBoolean("selected")?"✓  ":"     ")+option.optString("label"));
+            labels.add((option.optBoolean("selected")?"✓  ":"     ")+option.optString("label")+(captchaServers.contains(option.optString("label").trim())?"  · weryfikacja":""));
             callbacks.add(()->web.evaluateJavascript("window.RiveTV && RiveTV.choose("+index+")",result->{if(multiple)activate();}));
         }
         if(labels.isEmpty())return;
@@ -694,7 +839,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         web.evaluateJavascript("window.RiveTV ? RiveTV.target() : null",raw->{
             try{
                 JSONObject target=new JSONObject(raw);
-                if(target.optBoolean("search")){showSearchEditor(target);}
+                if(target.optBoolean("playback")){web.evaluateJavascript("window.RiveTV && RiveTV.media('toggle')",null);}
+                else if(target.optBoolean("search")){showSearchEditor(target);}
                 else if(target.optBoolean("select")){showSelect(target);}
                 else if(target.optBoolean("tap")){
                     if(target.optBoolean("player"))web.evaluateJavascript("window.RiveTV && RiveTV.enterPlayer()",null);
@@ -734,8 +880,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             if(!down && !centerPressedHere)return true;
             if(down && event.getRepeatCount()==0){centerPressedHere=true;centerLongPress=false;handler.postDelayed(longPress,600);}
             else if(down && event.isLongPress() && !centerLongPress){handler.removeCallbacks(longPress);longPress.run();}
-            else if(!down){centerPressedHere=false;handler.removeCallbacks(longPress);if(!centerLongPress){if(customView!=null&&!pointerMode)return super.dispatchKeyEvent(event);activate();}}
-            if(customView!=null&&!pointerMode&&!centerLongPress)return super.dispatchKeyEvent(event);
+            else if(!down){centerPressedHere=false;handler.removeCallbacks(longPress);if(!centerLongPress){if(customView!=null&&!pointerMode)web.evaluateJavascript("window.RiveTV && RiveTV.media('toggle')",null);else activate();}}
             return true;
         }
         if(key>=KeyEvent.KEYCODE_DPAD_UP && key<=KeyEvent.KEYCODE_DPAD_RIGHT){
@@ -769,7 +914,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private void goBack(){
         if(customView!=null){hideFullscreen();return;}
         if(pointerMode){togglePointer();return;}
-        if(web!=null){web.evaluateJavascript("window.RiveTV && (RiveTV.closeDropdown() || RiveTV.releasePlayer())",result->{if(!"true".equals(result))finishBack();});return;}
+        if(web!=null){web.evaluateJavascript("window.RiveTV && (RiveTV.closeDropdown() || RiveTV.revealPlayback() || RiveTV.releasePlayer())",result->{if(!"true".equals(result))finishBack();});return;}
         finishBack();
     }
     private void finishBack(){
@@ -781,6 +926,19 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     @Override protected void onPause(){if(updater!=null)updater.onPause();keyboardRequested=false;backPressedHere=false;centerPressedHere=false;stopArrowNavigation();arrowGeneration++;handler.removeCallbacks(longPress);if(web!=null){web.evaluateJavascript("window.RiveTV && RiveTV.media('pause')",null);web.onPause();}CookieManager.getInstance().flush();super.onPause();}
     @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();if(updater!=null)updater.onResume();}
     @Override protected void onDestroy(){if(updater!=null)updater.close();handler.removeCallbacksAndMessages(null);if(railAnimator!=null)railAnimator.cancel();if(web!=null){web.stopLoading();content.removeView(web);web.destroy();web=null;}super.onDestroy();}
+    private final class SpinnerView extends View{
+        final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF arc=new RectF();
+        final ObjectAnimator spin=ObjectAnimator.ofFloat(this,View.ROTATION,0f,360f);
+        SpinnerView(){super(MainActivity.this);setFocusable(false);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(4));p.setStrokeCap(Paint.Cap.ROUND);
+            spin.setDuration(1000);spin.setRepeatCount(ValueAnimator.INFINITE);spin.setInterpolator(new LinearInterpolator());}
+        @Override public void onVisibilityAggregated(boolean visible){super.onVisibilityAggregated(visible);if(visible){if(!spin.isStarted())spin.start();}else spin.cancel();}
+        @Override protected void onDetachedFromWindow(){spin.cancel();super.onDetachedFromWindow();}
+        @Override protected void onDraw(Canvas c){
+            float inset=dp(2);arc.set(inset,inset,getWidth()-inset,getHeight()-inset);
+            p.setColor(0x26ffffff);c.drawOval(arc,p);
+            p.setColor(0xffe50914);c.drawArc(arc,-90,90,false,p);
+        }
+    }
     private final class CursorView extends View{
         float x,y;final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
         CursorView(){super(MainActivity.this);setClickable(false);setFocusable(false);}

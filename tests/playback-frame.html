@@ -1,0 +1,17 @@
+<!doctype html><html><body>
+<button aria-label="Play">Play</button><video style="width:640px;height:360px"></video>
+<script>
+// Deterministic provider fixture in a different origin; no real stream needed.
+var video=document.querySelector('video'),time=0,paused=true;
+Object.defineProperties(video,{
+ currentTime:{get:()=>time,set:v=>{time=v;}},duration:{get:()=>1200},
+ readyState:{get:()=>4},paused:{get:()=>paused},ended:{get:()=>false}
+});
+video.play=function(){paused=false;video.dispatchEvent(new Event('playing'));return Promise.resolve();};
+video.pause=function(){paused=true;video.dispatchEvent(new Event('pause'));};
+window.addEventListener('message',function(e){
+ if(e.source!==parent)return;
+ if(e.data.fixture==='time'){time=e.data.time;video.dispatchEvent(new Event('seeked'));}
+ if(e.data.fixture==='probe')parent.postMessage({fixture:'probe',time:time,paused:paused,ui:document.documentElement.getAttribute('data-rive-cinema')},'*');
+});
+</script><script src="/app/src/main/assets/tv-playback.js"></script></body></html>

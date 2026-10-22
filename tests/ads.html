@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>Ad blocking regression</title>
+<script src="/app/src/main/assets/tv-ads.js"></script>
+<body style="margin:0"><button aria-label="Select Aggregator Server">Server 4 (Single-Server)</button><pre id="result"></pre>
+<iframe id="provider" src="/tests/ads-frame.html" style="position:absolute;left:100px;top:50px;width:640px;height:360px;border:0"></iframe>
+<script>
+(async function () {
+ var results=[], count=0, wait=ms=>new Promise(r=>setTimeout(r,ms));
+ function check(name,value) {results.push((value?'PASS ':'FAIL ')+name);count++;}
+ try {
+  var frame=document.getElementById('provider');
+  await new Promise(r=>frame.addEventListener('load',r));
+  var win=frame.contentWindow, doc=frame.contentDocument;
+  var popup=win.open('https://ads.example/popunder');
+  check('provider window.open returns an inert window',!!popup && popup.closed===false && typeof popup.focus==='function');
+  popup.location.href='https://ads.example/next';popup.document.write('x');
+  var event=new win.MouseEvent('click',{bubbles:true,cancelable:true});doc.getElementById('popunder').dispatchEvent(event);
+  check('provider target=_blank link is cancelled',event.defaultPrevented);
+  check('rivestream window.open stays native',/native code/.test(String(window.open)));
+  await wait(4500);
+  check('transparent click-jacking cover is removed',!doc.getElementById('dontfoid'));
+  check('shadow interstitial with ad signature is removed',!doc.querySelector('[doskip]'));
+  check('zero-size shadow host covering the player is removed',!doc.getElementById('shadowad'));
+  check('Skip ad interstitial with its ad clip is removed',!doc.getElementById('interstitial'));
+  check('real player and feature video stay',!!doc.getElementById('player') && !!doc.getElementById('feature'));
+  check('player gesture layer stays',!!doc.getElementById('gesture'));
+  check('pointer-transparent toaster stays',!!doc.getElementById('toaster'));
+  var turnstile=doc.createElement('div');turnstile.className='cf-turnstile';turnstile.id='turnstile';turnstile.style.cssText='position:absolute;left:40px;top:40px;width:300px;height:65px';
+  doc.body.appendChild(turnstile);await wait(4500);
+  check('captcha widget stays visible',!!doc.getElementById('turnstile') && doc.getElementById('turnstile').getBoundingClientRect().width===300);
+  check('root counts blocked popups',RiveTVAds.blocked()>=2);
+  check('root counts removed overlays',RiveTVAds.removed()>=4);
+  var captcha=JSON.parse(RiveTVAds.captcha()||'null');
+  check('captcha in provider frame is reported to root',!!captcha && captcha.kind==='Cloudflare Turnstile');
+  check('captcha position is in top-frame coordinates',!!captcha && Math.abs(captcha.x*innerWidth-(100+40+150))<2 && Math.abs(captcha.y*innerHeight-(50+40+32.5))<2);
+  check('captcha remembers the gated server',!!captcha && captcha.server==='Server 4 (Single-Server)');
+  doc.getElementById('turnstile').remove();await wait(4500);
+  check('solved captcha clears the report',RiveTVAds.captcha()===null);
+  window.postMessage({riveTV:'captcha',kind:'Cloudflare Turnstile',x:1,y:1},'*');await wait(50);
+  check('captcha messages from non-child windows are ignored',RiveTVAds.captcha()===null);
+  frame.contentWindow.eval("parent.postMessage({riveTV:'captcha',kind:'Fake kind',x:1,y:1},'*')");await wait(50);
+  check('unknown captcha kinds are ignored',RiveTVAds.captcha()===null);
+  var gate=document.createElement('iframe');gate.src='/tests/ads-captcha.html';gate.style.cssText='position:absolute;left:0;top:420px;width:400px;height:200px;border:0';
+  document.body.appendChild(gate);await new Promise(r=>gate.addEventListener('load',r));await wait(4500);
+  check('real verification overlay is never removed as a scam',!!gate.contentDocument.getElementById('challenge'));
+  check('captcha frame inside a closed shadow root is still reported',JSON.parse(RiveTVAds.captcha()||'{}').kind==='Cloudflare Turnstile');
+  check('verification frame is not dropped as an ad frame',gate.isConnected);
+  var fake=document.createElement('div');fake.id='qrscam';fake.style.cssText='position:fixed;inset:0;z-index:50;background:#fff';fake.textContent='Scan the QR code to prove you are not a robot';
+  document.body.appendChild(fake);await wait(3500);
+  check('fake QR robot check is removed',!document.getElementById('qrscam'));
+ } catch (error) {results.push('FAIL '+error.stack);}
+ document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
+})();
+</script>

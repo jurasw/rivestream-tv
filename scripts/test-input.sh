@@ -12,6 +12,6 @@ python3 scripts/with-timeout.py 30 adb -s "$RIVE_SERIAL" shell am start -n app.r
 python3 - <<'PY'
 from pathlib import Path
 s=Path('.artifacts/input-device-test.log').read_text()
-if 'FAIL' in s or s.count('PASS ') != 21:
+if 'FAIL' in s or s.count('PASS ') != 38:
     raise SystemExit(1)
 PY
