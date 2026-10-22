@@ -147,13 +147,23 @@
     scrollTargets = items;
     if (!scrollFrame) {scrollTime = performance.now();scrollFrame = requestAnimationFrame(animateScroll);}
   }
+  function alignRow(el) {
+    if (!el.matches('[class*="CardSmall__"]')) return;
+    var row = el.parentElement;
+    if (!row || row.scrollWidth <= row.clientWidth + 2 || !/auto|scroll/.test(getComputedStyle(row).overflowX)) return;
+    var pad = parseFloat(getComputedStyle(row).paddingLeft) || 0;
+    var left = Math.max(0, Math.min(row.scrollWidth - row.clientWidth, row.scrollLeft + el.getBoundingClientRect().left - row.getBoundingClientRect().left - pad));
+    if (Math.abs(row.scrollLeft - left) > 1) row.scrollTo({left:left, behavior:document.documentElement.hasAttribute('data-rive-repeat') ? 'auto' : 'smooth'});
+  }
   function setFocus(el, scroll, repeated) {
     if (!el) return false;
     if (window.RiveTVPlayback && RiveTVPlayback.hidden() && !el.closest('#rive-next-episode')) return false;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-rive-focus]'), function (old) {old.removeAttribute('data-rive-focus');});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-rive-focus],[data-rive-current]'), function (old) {old.removeAttribute('data-rive-focus');old.removeAttribute('data-rive-current');});
     selected = el;
     if (!active) return true;
     selected.setAttribute('data-rive-focus', 'true');
+    var episodeRow = el.closest('[class*="EpisodeList__"] [class*="episode__"]');
+    if (episodeRow) episodeRow.setAttribute('data-rive-current', 'true');
     try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
     if (scroll !== false) {
       var rect = el.getBoundingClientRect();
@@ -165,6 +175,7 @@
         if (scrolled.length && offset < innerHeight * .8) scrolled.forEach(function (parent) { parent.scrollTo({top:0, behavior:'smooth'}); });
         else el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
       } else el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      alignRow(el);
     }
     return true;
   }

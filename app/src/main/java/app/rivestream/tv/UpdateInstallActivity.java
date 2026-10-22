@@ -13,7 +13,7 @@ public final class UpdateInstallActivity extends Activity {
     private int targetVersion;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
-        TextView label=new TextView(this);label.setText(R.string.update_installing);label.setTextColor(Color.WHITE);label.setTextSize(22);label.setGravity(Gravity.CENTER);setContentView(label);
+        TextView label=new TextView(this);label.setText(R.string.update_installing);label.setTextColor(Color.WHITE);label.setTextSize(16);label.setGravity(Gravity.CENTER);setContentView(label);
         handle(getIntent());
     }
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handle(intent);}

@@ -22,7 +22,7 @@ final class TvIconDrawable extends Drawable {
     @Override public void draw(Canvas canvas){
         paint.setColorFilter(null);
         boolean focused=false,selected=false;for(int s:getState()){if(s==android.R.attr.state_focused)focused=true;if(s==android.R.attr.state_selected)selected=true;}
-        paint.setColor(focused?0xff141414:selected?Color.WHITE:0xffababab);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.8f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(focused||selected?Color.WHITE:0xffe5e5e5);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.8f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
         canvas.save();canvas.translate(getBounds().left,getBounds().top);canvas.scale(getBounds().width()/24f,getBounds().height()/24f);
         Path p=new Path();
         switch(name){

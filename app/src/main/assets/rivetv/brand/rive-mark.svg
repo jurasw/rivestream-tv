@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="rive" x1="0%" y1="0%" x2="100%" y2="75%"><stop offset="0%" stop-color="#f69b65"/><stop offset="50%" stop-color="#ed5c91"/><stop offset="100%" stop-color="#ef009d"/></linearGradient></defs><path fill="url(#rive)" d="M19 3h58Q93 3 93 19v58Q93 93 77 93H19Q3 93 3 77V19Q3 3 19 3z"/>
+<path fill="#121212" fill-rule="evenodd" d="M18 21h16q20 0 20 14 0 10-10 13l12 19H40L29 49v18H18zm11 10v10h5q7 0 7-5t-7-5z"/>
+<path fill="#121212" d="M37 59q-3-6 2-9 5-3 8 3l7 14 13-30q3-7 9-4 6 3 3 9L64 76q-3 7-9 7-6 0-9-6z"/>
+<path fill="#121212" d="M77 47h8q5 0 5 4t-5 4H74zM72 59h13q5 0 5 4t-5 4H69zM67 71h18q5 0 5 4t-5 4H64z"/>
+<rect x="18" y="71" width="11" height="8" rx="4" fill="#121212"/></svg>
