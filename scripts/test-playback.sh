@@ -12,7 +12,7 @@ for RIVE_ATTEMPT in {1..50}; do [[ -s "$RIVE_PORT_FILE" ]] && break; sleep .1; d
 RIVE_TEST_PORT=$(cat "$RIVE_PORT_FILE")
 [[ -n "$RIVE_TEST_PORT" ]] || { echo "Test server did not start" >&2; exit 1; }
 for RIVE_SUITE in playback ads servers; do
-RIVE_EXPECTED=71; [[ $RIVE_SUITE == ads ]] && RIVE_EXPECTED=23; [[ $RIVE_SUITE == servers ]] && RIVE_EXPECTED=4
+RIVE_EXPECTED=71; [[ $RIVE_SUITE == ads ]] && RIVE_EXPECTED=23; [[ $RIVE_SUITE == servers ]] && RIVE_EXPECTED=6
 RIVE_BROWSER_STATUS=0
 "$RIVE_CHROME" --headless --disable-gpu --disable-site-isolation-trials --no-first-run --no-default-browser-check \
     --user-data-dir="$RIVE_ROOT/.tools/test-playback-chrome" --allow-file-access-from-files \

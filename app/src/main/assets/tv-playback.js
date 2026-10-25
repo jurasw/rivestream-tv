@@ -285,6 +285,7 @@
     },
     subtitleKey:function () {if (!root) return '';loadPreferences();return nextPreferences.subtitleKey;},
     audioLanguage:function () {loadPreferences();return nextPreferences.audioLanguage;},
+    setAudioLanguage:function (value) {if (AUDIO_LANGUAGES.indexOf(value) === -1) return;loadPreferences();nextPreferences.audioLanguage = value;persistPreferences();},
     conceal:function () {if (!controls) return false;setControls(false);return true;},
     state:function () {return nextState;},
     flush:function () {document.querySelectorAll('video').forEach(report);sendChildren({riveTV:'command',action:'pause'});}
