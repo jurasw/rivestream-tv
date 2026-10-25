@@ -15,6 +15,7 @@ Object.defineProperties(video,{
 video.play=function(){paused=false;video.dispatchEvent(new Event('play'));video.dispatchEvent(new Event('playing'));return Promise.resolve();};
 video.pause=function(){paused=true;video.dispatchEvent(new Event('pause'));};
 var english=video.addTextTrack('subtitles','English','en'),polish=video.addTextTrack('subtitles','Polski','pl');
+if(kind==='vidstack')window.hls={media:video,audioTracks:[{lang:'en',name:'English'},{lang:'ja',name:'Japanese'}],audioTrack:0};
 window.addEventListener('message',function(e){
  if(e.source!==parent||!e.data||!e.data.fixture)return;
  if(e.data.fixture==='time'){time=e.data.time;video.dispatchEvent(new Event('seeked'));}
@@ -30,7 +31,7 @@ window.addEventListener('message',function(e){
    focus:focused?(focused.getAttribute('data-f')||focused.getAttribute('data-p')||focused.className):null,
    panel:open?open.className.replace(/\bpanel\b|\bopen\b/g,'').trim():null,
    items:root?Array.prototype.map.call(root.querySelectorAll('.col+.col .it'),x=>x.textContent):[],
-   modes:[english.mode,polish.mode],subtitle:root?root.querySelector('.sub span').textContent:'',
+   modes:[english.mode,polish.mode],audioTrack:window.hls?window.hls.audioTrack:null,subtitle:root?root.querySelector('.sub span').textContent:'',
    nextLabel:root?root.querySelector('[data-p="go"] span').textContent:'',nextTitle:root?root.querySelector('.nextp .num').textContent:'',
    rows:root?Array.prototype.filter.call(root.querySelectorAll('.row [data-f]'),x=>x.style.display!=='none').map(x=>x.getAttribute('data-f')):[]},'*');
  }

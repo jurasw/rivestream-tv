@@ -1,0 +1,43 @@
+<!doctype html><meta charset="utf-8"><title>Server search regression</title>
+<body><pre id="result"></pre>
+<script>
+(async function () {
+ var results=[], count=0;
+ function check(name,value) {results.push((value?'PASS ':'FAIL ')+name);count++;}
+ var wait=ms=>new Promise(r=>setTimeout(r,ms));
+ try {
+  localStorage.clear();
+  var audio=[], selected=-1, switched=0, preference='ja', list=null;
+  var source=document.createElement('button');source.id='source';source.setAttribute('aria-haspopup','listbox');source.setAttribute('aria-expanded','false');document.body.appendChild(source);
+  source.onclick=function () {
+   if (list) {list.remove();list=null;source.setAttribute('aria-expanded','false');return;}
+   list=document.createElement('div');list.setAttribute('role','listbox');
+   ['Server 1 (A)','Server 2 (B)','Server 3 (C)'].forEach(function (name,index) {
+    var option=document.createElement('div');option.setAttribute('role','option');option.textContent=name;option.setAttribute('aria-selected',String(index===selected));
+    option.onclick=function () {selected=index;switched=Date.now();};list.appendChild(option);
+   });
+   document.body.appendChild(list);source.setAttribute('aria-expanded','true');
+  };
+  window.RiveTV={};
+  window.RiveTVPlayback={audioLanguage:()=>preference,command:()=>{},
+   state:()=>selected===-1?null:{received:Date.now(),duration:1400,time:Date.now()-switched>500?3:0,buffering:false,paused:false}};
+  window.RiveTVPlayer={status:()=>({audio:selected===-1?'unknown':audio[selected]})};
+  async function run(episode,tracks) {
+   audio=tracks;history.replaceState({},'','/watch?type=tv&id=1&season=1&episode='+episode);
+   await wait(700);
+   for (var i=0;i<100;i++) {await wait(200);var state=RiveTVServers.state();if (state&&state.phase==='done') return state;}
+   return RiveTVServers.state()||{};
+  }
+  (0,eval)(await (await fetch('/app/src/main/assets/tv-servers.js')).text());
+  var state=await run(1,['other','match','match']);
+  check('search skips a server without the preferred audio language',state.phase==='done'&&/^Server 2/.test(state.label));
+  state=await run(2,['other','other','other']);
+  check('without a matching language the first working server is used',state.phase==='done'&&/^Server 2/.test(state.label));
+  var began=Date.now();state=await run(3,['unknown','unknown','unknown']);
+  check('unlabelled audio is accepted after a short wait',state.phase==='done'&&/^Server 2/.test(state.label)&&Date.now()-began>=2500);
+  preference='';state=await run(4,['other','match','match']);
+  check('no preference keeps the first working server',state.phase==='done'&&/^Server 2/.test(state.label));
+ } catch (error) {results.push('FAIL '+error.stack);}
+ document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
+})();
+</script>

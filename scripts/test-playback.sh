@@ -11,7 +11,8 @@ trap 'kill "$RIVE_TEST_SERVER_PID" 2>/dev/null || true; wait "$RIVE_TEST_SERVER_
 for RIVE_ATTEMPT in {1..50}; do [[ -s "$RIVE_PORT_FILE" ]] && break; sleep .1; done
 RIVE_TEST_PORT=$(cat "$RIVE_PORT_FILE")
 [[ -n "$RIVE_TEST_PORT" ]] || { echo "Test server did not start" >&2; exit 1; }
-for RIVE_SUITE in playback ads; do
+for RIVE_SUITE in playback ads servers; do
+RIVE_EXPECTED=71; [[ $RIVE_SUITE == ads ]] && RIVE_EXPECTED=23; [[ $RIVE_SUITE == servers ]] && RIVE_EXPECTED=4
 RIVE_BROWSER_STATUS=0
 "$RIVE_CHROME" --headless --disable-gpu --disable-site-isolation-trials --no-first-run --no-default-browser-check \
     --user-data-dir="$RIVE_ROOT/.tools/test-playback-chrome" --allow-file-access-from-files \
@@ -20,7 +21,7 @@ RIVE_BROWSER_STATUS=0
 if (( RIVE_BROWSER_STATUS != 0 )); then
     echo "Chrome zakończył proces kodem $RIVE_BROWSER_STATUS; sprawdzam komplet wyników testu w zapisanym DOM (log: .artifacts/$RIVE_SUITE-test-browser.log)." >&2
 fi
-python3 - ".artifacts/$RIVE_SUITE-test.html" "$([[ $RIVE_SUITE == ads ]] && echo 23 || echo 62)" <<'PY'
+python3 - ".artifacts/$RIVE_SUITE-test.html" "$RIVE_EXPECTED" <<'PY'
 from html.parser import HTMLParser
 import sys
 class Result(HTMLParser):

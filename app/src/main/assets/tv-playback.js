@@ -5,8 +5,8 @@
   var context = null, route = '', videos = new WeakMap(), clicked = new WeakSet();
   var started = false, controls = false, hideTimer, lastSaved = 0;
   var nextPanel, nextSettings, nextState = null, nextCountdown = 0, nextCancelled = false, advancing = false;
-  var nextPreferences = {autoNext:false,outroSeconds:90,subtitles:null}, nextView = {eligible:false};
-  var preferencesLoaded = false;
+  var nextPreferences = {autoNext:false,outroSeconds:90,subtitles:null,subtitleKey:'',audioLanguage:''}, nextView = {eligible:false};
+  var preferencesLoaded = false, AUDIO_LANGUAGES = ['','ja','en','pl'];
   function loadPreferences() {
     if (preferencesLoaded) return;
     preferencesLoaded = true;
@@ -16,6 +16,8 @@
       nextPreferences.autoNext = storedPreferences.autoNext === true;
       if ([0,30,60,90,120,180].indexOf(storedPreferences.outroSeconds) !== -1) nextPreferences.outroSeconds = storedPreferences.outroSeconds;
       if (typeof storedPreferences.subtitles === 'string' && storedPreferences.subtitles.length <= 80) nextPreferences.subtitles = storedPreferences.subtitles;
+      if (typeof storedPreferences.subtitleKey === 'string' && /^[\w-]{0,100}$/.test(storedPreferences.subtitleKey)) nextPreferences.subtitleKey = storedPreferences.subtitleKey;
+      if (AUDIO_LANGUAGES.indexOf(storedPreferences.audioLanguage) !== -1) nextPreferences.audioLanguage = storedPreferences.audioLanguage;
     } catch (_) {}
   }
   function persistPreferences() {
@@ -66,12 +68,19 @@
     var group = mode && mode.closest('[class*="group__"]');
     if (!group) return;
     nextSettings = document.createElement('div');nextSettings.id = 'rive-next-settings';
-    nextSettings.innerHTML = '<label for="rive-auto-next">Auto next — następny odcinek</label><button id="rive-auto-next" type="button" role="switch"></button><label for="rive-outro-seconds">Pokaż przycisk przed końcem odcinka</label><select id="rive-outro-seconds"><option value="0">Po zakończeniu</option><option value="30">30 sekund</option><option value="60">1 minuta</option><option value="90">1,5 minuty</option><option value="120">2 minuty</option><option value="180">3 minuty</option></select><p>Przycisk „Następny odcinek” pozwala przejść od razu. Auto next przełącza po 15 sekundach; odliczanie można anulować. Czas outro jest przybliżony.</p>';
+    nextSettings.innerHTML = '<label for="rive-auto-next">Auto next — następny odcinek</label><button id="rive-auto-next" type="button" role="switch"></button><label for="rive-outro-seconds">Pokaż przycisk przed końcem odcinka</label><select id="rive-outro-seconds"><option value="0">Po zakończeniu</option><option value="30">30 sekund</option><option value="60">1 minuta</option><option value="90">1,5 minuty</option><option value="120">2 minuty</option><option value="180">3 minuty</option></select><p>Przycisk „Następny odcinek” pozwala przejść od razu. Auto next przełącza po 15 sekundach; odliczanie można anulować. Czas outro jest przybliżony.</p>' +
+      '<label for="rive-audio-language">Preferowany język audio</label><select id="rive-audio-language"><option value="">Bez preferencji</option><option value="ja">Japoński</option><option value="en">Angielski</option><option value="pl">Polski</option></select>' +
+      '<label for="rive-subtitle-key">Klucz Wyzie do napisów</label><input id="rive-subtitle-key" type="text" autocomplete="off" spellcheck="false" placeholder="Wpisz klucz">' +
+      '<p>Język audio: wyszukiwanie serwera wybiera ścieżkę w tym języku, gdy serwer ją oznacza. Klucz Wyzie (darmowy, store.wyzie.io/redeem) włącza listę napisów w odtwarzaczu. Zostaje tylko na tym urządzeniu.</p>';
     var toggle = nextSettings.querySelector('button');
     function label() {toggle.textContent = nextPreferences.autoNext ? 'Włączone' : 'Wyłączone';toggle.setAttribute('aria-checked',String(nextPreferences.autoNext));}
     label();toggle.onclick = function () {nextPreferences.autoNext = !nextPreferences.autoNext;persistPreferences();label();};
     var select = nextSettings.querySelector('select');select.value = String(nextPreferences.outroSeconds);
     select.onchange = function () {nextPreferences.outroSeconds = Number(select.value);persistPreferences();};
+    var audio = nextSettings.querySelector('#rive-audio-language');audio.value = nextPreferences.audioLanguage;
+    audio.onchange = function () {nextPreferences.audioLanguage = AUDIO_LANGUAGES.indexOf(audio.value) !== -1 ? audio.value : '';persistPreferences();};
+    var key = nextSettings.querySelector('#rive-subtitle-key');key.value = nextPreferences.subtitleKey;
+    key.oninput = key.onchange = function () {var value = key.value.trim();if (/^[\w-]{0,100}$/.test(value)) {nextPreferences.subtitleKey = value;persistPreferences();}};
     group.appendChild(nextSettings);
   }
   function updateNext() {
@@ -267,13 +276,15 @@
       updateRoute();
       if (!context) return null;
       return {type:context.type,id:context.id,season:context.season,episode:context.episode,next:nextView,
-        hasNext:context.type === 'tv' && !advancing && !!nextEpisodeAction(),subtitles:nextPreferences.subtitles};
+        hasNext:context.type === 'tv' && !advancing && !!nextEpisodeAction(),subtitles:nextPreferences.subtitles,audioLanguage:nextPreferences.audioLanguage};
     },
     cancelNext:function () {nextCancelled = true;nextCountdown = 0;updateNext();},
     subtitles:function (value) {
       if (value !== null && (typeof value !== 'string' || value.length > 80)) return;
       loadPreferences();nextPreferences.subtitles = value;persistPreferences();
     },
+    subtitleKey:function () {if (!root) return '';loadPreferences();return nextPreferences.subtitleKey;},
+    audioLanguage:function () {loadPreferences();return nextPreferences.audioLanguage;},
     conceal:function () {if (!controls) return false;setControls(false);return true;},
     state:function () {return nextState;},
     flush:function () {document.querySelectorAll('video').forEach(report);sendChildren({riveTV:'command',action:'pause'});}

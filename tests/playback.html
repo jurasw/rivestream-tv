@@ -18,6 +18,12 @@
   check('auto next switch saves enabled preference',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).autoNext===true);
   var seconds=document.querySelector('#rive-outro-seconds');seconds.value='120';seconds.dispatchEvent(new Event('change'));
   check('outro lead time persists',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).outroSeconds===120);
+  var audioPick=document.querySelector('#rive-audio-language');audioPick.value='ja';audioPick.dispatchEvent(new Event('change'));
+  check('preferred audio language persists',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).audioLanguage==='ja');
+  var keyInput=document.querySelector('#rive-subtitle-key');keyInput.value=' fixture-key ';keyInput.dispatchEvent(new Event('input'));
+  check('subtitle key persists trimmed',RiveTVPlayback.subtitleKey()==='fixture-key');
+  keyInput.value='bad key!';keyInput.dispatchEvent(new Event('input'));
+  check('malformed subtitle key is rejected',RiveTVPlayback.subtitleKey()==='fixture-key');
   history.replaceState({},'', '/watch?type=tv&id=1&season=1&episode=1');
   var handle=document.createElement('button');handle.setAttribute('aria-label','Toggle Quick Menu');document.body.appendChild(handle);
   var calls=0, props={season:'1',episode:'1',hasNextEpisode:true,onNextEpisode:()=>calls++};
@@ -93,6 +99,14 @@
   handle.__reactFiber$fixture={memoizedProps:props2,memoizedState:null,return:{memoizedState:{memoizedState:details,next:{memoizedState:season,next:null}},return:fiberTop}};
   history.replaceState({},'', '/watch?type=tv&id=7&season=1&episode=1');
   var playbackTick=tick;window.setInterval=realInterval;realInterval(()=>playbackTick(),1000);
+  var realFetch=window.fetch.bind(window),subtitleQueries=[];
+  var czech=new Uint8Array(Array.from('1\n00:00:01,000 --> 00:00:04,000\n').map(c=>c.charCodeAt(0)).concat([0x8E,0x6C,0x75,0x9D,0x6F,0x75,0xE8,0x6B,0xFD,0x20,0x6B,0xF9,0xF2,0x0A]));
+  window.fetch=function(url){
+   url=String(url);
+   if(url.indexOf('https://sub.wyzie.io/search')===0){subtitleQueries.push(url);return Promise.resolve(new Response(JSON.stringify([{url:'https://subs.fixture.test/cs.srt',language:'cs',display:'Czech',encoding:'CP1250'},{url:'https://subs.fixture.test/en.srt',language:'en',display:'English'},{url:'https://subs.fixture.test/en2.srt',language:'en',display:'English'},{url:'http://subs.fixture.test/de.srt',language:'de',display:'German'}])));}
+   if(url==='https://subs.fixture.test/cs.srt')return Promise.resolve(new Response(czech));
+   return realFetch.apply(null,arguments);
+  };
   (0,eval)(await (await fetch('/app/src/main/assets/tv-player.js')).text());
   var frame=await provider('jw'),state=await probe(frame);
   check('overlay mounts in the provider frame that owns the video',state.overlay&&!state.hostHidden);
@@ -115,7 +129,7 @@
   check('Back on the compact bar reveals full controls',RiveTV.revealPlayback()===true);
   await wait(200);state=await probe(frame);check('full controls follow the compact bar',state.visible&&!state.compact);
   await press('down');await press('right',6);await press('ok');state=await probe(frame);
-  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Wyłączone,English,Polski');
+  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Wyłączone,English,Polski,Angielski,Czeski');
   await press('down');await press('ok');frame.contentWindow.postMessage({fixture:'cue'},'*');await wait(200);state=await probe(frame);
   check('selected subtitle track is rendered by the overlay',state.modes.join()==='hidden,disabled'&&state.subtitle==='Hello world');
   check('subtitle choice is remembered for next episodes',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='english');
@@ -141,6 +155,15 @@
   check('Vidstack controls and custom overlays are hidden',state.overlay&&state.providerHidden&&state.videoVisible);
   await press('down');state=await probe(frame);
   check('movies have no episode buttons',state.rows.join()==='play,rewind,forward,volume,tracks,speed');
+  check('subtitle search uses the TMDB id and stored key',subtitleQueries.indexOf('https://sub.wyzie.io/search?id=45745&key=fixture-key')!==-1);
+  await press('right',4);await press('ok');state=await probe(frame);
+  check('subtitle panel adds deduplicated secure Wyzie languages',state.items.join()==='Wyłączone,English,Polski,Angielski,Czeski');
+  await press('down',4);await press('ok');frame.contentWindow.postMessage({fixture:'time',time:2},'*');await wait(1600);state=await probe(frame);
+  check('Wyzie subtitles in cp1250 are decoded and rendered',state.subtitle==='Žluťoučký kůň');
+  check('Wyzie subtitle choice is remembered',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='czeski');
+  frame.contentWindow.postMessage({fixture:'time',time:10},'*');await wait(1600);state=await probe(frame);
+  check('Wyzie subtitle clears after its cue ends',state.subtitle==='');
+  check('preferred Japanese audio track is selected',state.audioTrack===1&&RiveTVPlayer.status().audio==='match');
  } catch (error) {results.push('FAIL '+error.stack);}
  document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
 })();

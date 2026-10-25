@@ -88,8 +88,8 @@
     '@keyframes rive-spin{to{transform:rotate(360deg)}}' +
     '.err{position:absolute;left:440px;top:50%;width:560px;padding:30px;margin-top:-110px;background:#262626;border-radius:4px;display:none}.err.on2{display:block}' +
     '.err p{margin:0 0 12px;font-size:24px;font-weight:500}.err span{display:block;font-size:18px;line-height:22px;color:#d2d2d2;margin-bottom:26px}.err div{display:flex;gap:14px}' +
-    '.sub{position:absolute;left:120px;right:120px;bottom:8%;text-align:center;transition:transform .3s ease}.sub.up{transform:translateY(-150px)}' +
-    '.sub span{font-size:36px;line-height:1.25;font-weight:500;white-space:pre-line;text-shadow:0 0 6px #000,0 2px 3px #000,0 0 2px #000}';
+    '.sub{position:absolute;left:144px;right:144px;bottom:9.5%;text-align:center;transition:transform .3s ease;pointer-events:none}.sub.up{transform:translateY(-150px)}' +
+    '.sub span{display:inline-block;font-size:44px;line-height:1.22;font-weight:600;letter-spacing:.2px;color:#fff;white-space:pre-line;text-shadow:0 0 7px rgba(0,0,0,.9),0 2px 3px rgba(0,0,0,.85),0 0 1px #000}';
   var markup = '<div class="stage">' +
     '<div class="sub"><span></span></div>' +
     '<div class="spin"><svg viewBox="0 0 72 72" fill="none"><circle cx="36" cy="36" r="33" stroke="rgba(255,255,255,.15)" stroke-width="6"/><path d="M36 3A33 33 0 0 1 69 36" stroke="#e50914" stroke-width="6" stroke-linecap="round"/></svg></div>' +
@@ -173,6 +173,8 @@
   var pausedScreen = false, introShown = false, errorIndex = 0, scrub = null, scrubRepeat = 0;
   var hideTimer, pauseTimer, progressTimer, introTimer, bufferTimer, siteVisible = false, lastStatus = '', statusSent = 0;
   var subTrack = null, subReady = false, audioList = null, subList = null, speedIndex = 2, documentCss = null;
+  var externalCues = null, externalTried = false, audioPicked = false;
+  var AUDIO_MATCH = {ja:/^(ja|jpn|jp)\b|japan|japo|日本/i,en:/^(en|eng)\b|english|angiel/i,pl:/^(pl|pol)\b|polish|polsk|lektor/i};
 
   function siteMode() {
     if (root) return !!(playback() && playback().isWatch() && !playback().hidden());
@@ -243,7 +245,8 @@
   function bind(next) {
     if (video) events.forEach(function (name) {video.removeEventListener(name,onVideo);});
     if (subTrack) subTrack.removeEventListener('cuechange',renderCues);
-    video = next;subTrack = null;subReady = false;audioList = subList = null;
+    if (video) video.removeEventListener('timeupdate',renderCues);
+    video = next;subTrack = null;subReady = false;audioPicked = false;audioList = subList = null;
     if (!video) {
       marked.forEach(function (node) {node.removeAttribute('data-rive-main');});marked = [];
       document.documentElement.removeAttribute('data-rive-player');
@@ -253,11 +256,12 @@
     }
     mount();attach();
     events.forEach(function (name) {video.addEventListener(name,onVideo);});
+    video.addEventListener('timeupdate',renderCues);
     if (video.muted) video.muted = false;
     renderPlay();renderCues();
   }
   function reset(next) {
-    sessionId = next;nextShown = nextDismissed = nextPreview = introShown = false;scrub = null;subReady = false;
+    sessionId = next;nextShown = nextDismissed = nextPreview = introShown = false;scrub = null;subReady = false;externalCues = null;externalTried = false;
     if (host) {hideControls();setPausedScreen(false);}
   }
   function onVideo(event) {
@@ -695,6 +699,34 @@
     } catch (_) {}
     return empty;
   }
+  function audioLanguages() {
+    var out = [], add = function (language,name) {out.push(text(language,20) + ' ' + text(name,60));};
+    if (!video) return out;
+    try {
+      var native = video.audioTracks;
+      if (native && native.length) for (var i = 0; i < native.length; i++) add(native[i].language,native[i].label);
+      else {
+        var hls = hlsPlayer(), player = jw(), vjs = videojsPlayer(), tracks = vjs && vjs.audioTracks && vjs.audioTracks();
+        if (hls) hls.audioTracks.forEach(function (track) {add(track.lang,track.name);});
+        else if (player) (player.getAudioTracks() || []).forEach(function (track) {add(track.language,track.name || track.label);});
+        else if (tracks) for (var k = 0; k < tracks.length; k++) add(tracks[k].language,tracks[k].label);
+      }
+    } catch (_) {}
+    return out.filter(function (value) {return /\S/.test(value);});
+  }
+  function audioMatch() {
+    var wanted = view && AUDIO_MATCH[view.audioLanguage], langs = audioLanguages();
+    if (!wanted || !langs.length) return null;
+    return langs.findIndex(function (value) {return wanted.test(value.trim());});
+  }
+  function syncAudio() {
+    if (audioPicked || !view || !view.audioLanguage) return;
+    var langs = audioLanguages();
+    if (!langs.length) return;
+    audioPicked = true;
+    var index = audioMatch(), source = audioSource();
+    if (index !== -1 && source.items.length === langs.length && source.current !== index) {source.select(index);audioList = null;}
+  }
   function textTracks() {
     var list = video && video.textTracks;
     return list ? Array.prototype.filter.call(list,function (track) {return track.kind === 'subtitles' || track.kind === 'captions';}) : [];
@@ -704,6 +736,19 @@
     try { return player && typeof player.getCaptionsList === 'function' && (player.getCaptionsList() || []).length > 1 ? player : null; } catch (_) { return null; }
   }
   function subtitleSource() {
+    var inner = embeddedSubtitles(), external = (view && view.external) || [], count = inner.items.length;
+    var names = inner.items.map(function (name) {return name.toLowerCase();});
+    var shown = external.filter(function (name) {return names.indexOf(name.toLowerCase()) === -1;});
+    var chosen = externalCues ? shown.indexOf(externalCues.label) : -1;
+    return {items:inner.items.concat(shown),current:chosen !== -1 ? count + chosen : inner.current,select:function (index) {
+      if (index < count) {externalCues = null;inner.select(index);renderCues();return;}
+      var name = shown[index - count];
+      if (subTrack) chooseText(null);
+      externalCues = {label:name,cues:[]};
+      act('externalSub',{index:external.indexOf(name),label:name});
+    }};
+  }
+  function embeddedSubtitles() {
     var player = jwCaptions();
     if (player) {
       var captions = player.getCaptionsList();
@@ -724,8 +769,12 @@
   function renderCues() {
     if (!host) return;
     var lines = [];
+    if (externalCues && video) {
+      var now = video.currentTime;
+      externalCues.cues.forEach(function (cue) {if (now >= cue[0] && now <= cue[1]) lines.push(cue[2]);});
+    }
     try {
-      var cues = subTrack && subTrack.activeCues;
+      var cues = !externalCues && subTrack && subTrack.activeCues;
       if (cues) for (var i = 0; i < cues.length; i++) if (typeof cues[i].text === 'string') lines.push(cues[i].text);
     } catch (_) {}
     var value = lines.join('\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').trim();
@@ -742,6 +791,18 @@
       if (!preference) chosen = tracks.find(function (track) {return track.mode === 'showing';}) || null;
       chooseText(chosen);
     } else if (subTrack && subTrack.mode !== 'hidden') subTrack.mode = 'hidden';
+    var external = (view && view.external) || [], preference = view && view.subtitles;
+    if (!externalTried && !subTrack && !externalCues && external.length && preference && preference !== 'off') {
+      externalTried = true;
+      var wanted = preference.replace(/ \(sdh\)$/,''), index = external.findIndex(function (name) {return name.toLowerCase() === preference;});
+      if (index === -1) index = external.findIndex(function (name) {return name.toLowerCase().replace(/ \(sdh\)$/,'') === wanted;});
+      if (index !== -1) {externalCues = {label:external[index],cues:[]};act('externalSub',{index:index,label:external[index]});}
+    }
+  }
+  function receiveCues(message) {
+    if (!externalCues || message.label !== externalCues.label || !Array.isArray(message.cues)) return;
+    externalCues.cues = message.cues.filter(function (cue) {return Array.isArray(cue) && typeof cue[2] === 'string';});
+    renderCues();
   }
   function updateNext() {
     var next = view && view.next;
@@ -761,7 +822,9 @@
     if (visible) renderChrome();
   }
   function status() {
-    return {riveTV:'overlay',id:id,active:!!(video && sessionId && host),visible:visible && !compact || errorShown(),panel:visible ? panel : null,ready:!!view};
+    var match = video ? audioMatch() : null;
+    return {riveTV:'overlay',id:id,active:!!(video && sessionId && host),visible:visible && !compact || errorShown(),panel:visible ? panel : null,ready:!!view,
+      audio:match === null ? 'unknown' : match === -1 ? 'other' : 'match'};
   }
   function report(force) {
     if (root) return;
@@ -786,7 +849,8 @@
       if (site) document.documentElement.removeAttribute('data-rive-player');
       else if (!document.documentElement.hasAttribute('data-rive-player')) document.documentElement.setAttribute('data-rive-player','');
       host.hidden = site;
-      syncSubtitles();buffering();renderError();
+      syncSubtitles();syncAudio();buffering();renderError();
+      if (externalCues) renderCues();
       if (!visible && !introShown && !video.paused && video.currentTime < 30) intro();
     }
     if (frameMarks.length && Date.now() - frameMarked > 4000) unmarkFrame();
@@ -825,6 +889,72 @@
       return saved ? saved.complete ? 1 : saved.time / saved.duration : 0;
     } catch (_) { return 0; }
   }
+  var subtitleSearch = {route:'',items:[]}, LANGUAGE_RANK = ['pl','en'];
+  function languageName(code,fallback) {
+    try {
+      var name = code && new Intl.DisplayNames(['pl'],{type:'language'}).of(code);
+      if (name && name !== code) return name.charAt(0).toUpperCase() + name.slice(1);
+    } catch (_) {}
+    return fallback;
+  }
+  function externalSubtitles(info) {
+    var key = playback().subtitleKey ? playback().subtitleKey() : '';
+    var route = [info.type,info.id,info.season,info.episode,key].join(':');
+    if (subtitleSearch.route === route) return subtitleSearch.items;
+    var search = subtitleSearch = {route:route,items:[]};
+    if (!key) return search.items;
+    var url = 'https://sub.wyzie.io/search?id=' + encodeURIComponent(info.id) + (info.type === 'tv' ? '&season=' + encodeURIComponent(info.season) + '&episode=' + encodeURIComponent(info.episode) : '') + '&key=' + encodeURIComponent(key);
+    fetch(url).then(function (response) {return response.ok ? response.json() : [];}).then(function (list) {
+      if (subtitleSearch !== search || !Array.isArray(list)) return;
+      var seen = {};
+      list.forEach(function (entry) {
+        if (!entry || typeof entry.url !== 'string' || entry.url.indexOf('https://') !== 0) return;
+        var code = text(entry.language,8).toLowerCase(), name = languageName(code,text(entry.display || entry.language,40));
+        if (!name) return;
+        var label = name + (entry.isHearingImpaired === true ? ' (SDH)' : '');
+        if (seen[label]) return;
+        seen[label] = true;
+        search.items.push({label:label,code:code,url:entry.url,encoding:text(entry.encoding,20)});
+      });
+      search.items.sort(function (a,b) {
+        var ra = LANGUAGE_RANK.indexOf(a.code), rb = LANGUAGE_RANK.indexOf(b.code);
+        return (ra === -1 ? 9 : ra) - (rb === -1 ? 9 : rb) || a.label.localeCompare(b.label,'pl');
+      });
+      search.items = search.items.slice(0,40);
+    }).catch(function () {});
+    return search.items;
+  }
+  function decodeSubtitles(buffer,encoding) {
+    try { return new TextDecoder('utf-8',{fatal:true}).decode(buffer); } catch (_) {}
+    try { return new TextDecoder(/1250|1252|8859/.test(encoding) ? encoding.toLowerCase() : 'windows-1250').decode(buffer); } catch (_) {}
+    return new TextDecoder('utf-8').decode(buffer);
+  }
+  function parseCues(source) {
+    var cues = [];
+    var time = function (h,m,sec,ms) {return Number(h || 0) * 3600 + Number(m) * 60 + Number(sec) + Number((ms + '00').slice(0,3)) / 1000;};
+    source.replace(/\r/g,'').split(/\n\s*\n/).forEach(function (block) {
+      var lines = block.split('\n'), at = lines.findIndex(function (line) {return line.indexOf('-->') !== -1;});
+      var m = at !== -1 && /(?:(\d+):)?(\d+):(\d+)[.,](\d+)\s*-->\s*(?:(\d+):)?(\d+):(\d+)[.,](\d+)/.exec(lines[at]);
+      if (!m) return;
+      var body = lines.slice(at + 1).join('\n').replace(/<[^>]*>/g,'').replace(/\{\\[^}]*\}/g,'').trim();
+      if (body) cues.push([time(m[1],m[2],m[3],m[4]),time(m[5],m[6],m[7],m[8]),body.slice(0,400)]);
+    });
+    return cues.slice(0,6000);
+  }
+  function loadSubtitle(index,label,frame) {
+    var item = subtitleSearch.items[index];
+    if (!item || item.label !== label) return;
+    var send = function (cues) {
+      var message = {riveTV:'cues',session:session(),label:label,cues:cues};
+      if (frame) {try { frame.contentWindow.postMessage(message,'*'); } catch (_) {}} else receiveCues(message);
+    };
+    if (item.cues) {send(item.cues);return;}
+    fetch(item.url).then(function (response) {return response.ok ? response.arrayBuffer() : null;}).then(function (buffer) {
+      if (!buffer) return;
+      item.cues = parseCues(decodeSubtitles(buffer,item.encoding));
+      send(item.cues);
+    }).catch(function () {});
+  }
   function buildView() {
     var info = playback() && playback().info();
     if (!info) return null;
@@ -843,7 +973,8 @@
     return {session:playback().session(),type:info.type,id:info.id,title:title,season:info.season,episode:info.episode,
       episodeTitle:current ? current.title : '',synopsis:current && current.synopsis || text(details.overview,400),
       tagline:text(details.tagline,120),still:current ? current.still : '',backdrop:still(details.backdrop_path),
-      hasNext:info.hasNext,next:info.hasNext ? next : null,episodes:episodes,subtitles:info.subtitles};
+      hasNext:info.hasNext,next:info.hasNext ? next : null,episodes:episodes,subtitles:info.subtitles,audioLanguage:info.audioLanguage,
+      external:externalSubtitles(info).map(function (item) {return item.label;})};
   }
   function rootTick() {
     var next = buildView();
@@ -859,12 +990,13 @@
     if (remote && remote.active && Date.now() - remote.received < 3500 && remote.session === session()) return remote;
     return null;
   }
-  function perform(message) {
+  function perform(message,frame) {
     var info = playback() && playback().info();
     if (!info) return;
     if (message.action === 'next') playback().next();
     else if (message.action === 'cancelNext') playback().cancelNext();
     else if (message.action === 'subtitles') playback().subtitles(typeof message.value === 'string' ? message.value.slice(0,80) : null);
+    else if (message.action === 'externalSub' && typeof message.index === 'number' && typeof message.label === 'string') loadSubtitle(message.index,message.label,frame);
     else if (message.action === 'site') {if (window.RiveTV && window.RiveTV.siteControls) window.RiveTV.siteControls(true);else playback().reveal();}
     else if (message.action === 'exit') {playback().flush();if (window.next && window.next.router) window.next.router.push('/');else location.assign('/');}
     else if (message.action === 'episode' && info.type === 'tv' && rootView) {
@@ -888,6 +1020,9 @@
         if (!fresh(msg.seq)) return;
         if (msg.owner === id) handleKey(String(msg.key),msg.repeat === true);
         else down(msg);
+      } else if (msg.riveTV === 'cues') {
+        down(msg);
+        if (msg.session === sessionId) receiveCues(msg);
       } else if (msg.riveTV === 'controls') siteVisible = msg.visible === true;
       return;
     }
@@ -902,13 +1037,14 @@
     if (msg.riveTV === 'overlay') {
       if (msg.active !== true && !(remote && remote.id === msg.id)) return;
       if (msg.ready !== true && rootView) down({riveTV:'view',view:rootView});
-      remote = {id:msg.id,active:msg.active === true,visible:msg.visible === true,panel:typeof msg.panel === 'string' ? msg.panel : null,frame:frame,received:Date.now(),session:session()};
-    } else if (remote && remote.frame === frame && remote.id === msg.id) perform(msg);
+      remote = {id:msg.id,active:msg.active === true,visible:msg.visible === true,panel:typeof msg.panel === 'string' ? msg.panel : null,frame:frame,received:Date.now(),session:session(),
+        audio:['match','other'].indexOf(msg.audio) !== -1 ? msg.audio : 'unknown'};
+    } else if (remote && remote.frame === frame && remote.id === msg.id) perform(msg,frame);
   });
   window.RiveTVPlayer = {
     active:function () {return root && !!(playback() && playback().isWatch() && current());},
     owns:function () {return this.active() && playback().hidden();},
-    status:function () {var value = current();return value ? {id:value.id,local:!!value.local,visible:value.visible,panel:value.panel} : null;},
+    status:function () {var value = current();return value ? {id:value.id,local:!!value.local,visible:value.visible,panel:value.panel,audio:value.audio || 'unknown'} : null;},
     key:function (key,repeat) {
       var target = current();
       if (!target) return false;
