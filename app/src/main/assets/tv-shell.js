@@ -116,7 +116,7 @@
     '.k{position:relative;height:56px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#2a2a2a;color:#e5e5e5;font-size:24px;line-height:1;transition:background-color .1s,color .1s,transform .15s}' +
     '.kr .k{flex:1}.k svg{width:26px;height:26px}.k.f{background:#fff;color:#000;transform:scale(1.06);z-index:1}' +
     '.k.mic{color:#fff;background:linear-gradient(135deg,#f69b65,#ed5c91 55%,#ef009d)}.k.mic.f{background:#fff;color:#ed5c91}' +
-    '.sug{margin-top:26px}.sug div{padding:9px 14px;margin:0 -14px;border-radius:4px;font-size:20px;line-height:26px;color:#b3b3b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sug div.f{background:#fff;color:#000}' +
+    '.sug{margin-top:26px}.sug div{padding:9px 14px;margin:0 -14px;border-radius:4px;font-size:20px;line-height:26px;color:#b3b3b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sug div b{color:#fff;font-weight:500}.sug div.f{background:#fff;color:#000}.sug div.f b{color:#000}' +
     '.sr{position:absolute;left:496px;top:118px;width:944px;height:calc(var(--h,810px) - 118px)}' +
     '.sq{height:46px;margin-bottom:22px;font-size:34px;line-height:46px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sq.ph2{font-size:26px;font-weight:400;color:#808080}' +
     '.gw{position:absolute;left:-20px;top:58px;right:0;bottom:0;overflow:hidden}' +
@@ -598,8 +598,33 @@
   function searchResults(query) {
     if (!query) return results({requestID:'trending', page:1}, null, 30);
     return request({requestID:'searchMulti', query:query, page:1}).then(function (data) {
-      return ((data && data.results) || []).map(function (raw) { return normalize(raw); }).filter(function (item) { return item && (item.backdrop || item.poster); }).slice(0, 36);
+      var raw = (data && data.results) || [];
+      var items = raw.map(function (entry) { return normalize(entry); }).filter(function (item) { return item && (item.backdrop || item.poster); });
+      items = items.sort(function (a, b) { return match(a.title, query) - match(b.title, query) || (b.raw.popularity || 0) - (a.raw.popularity || 0); }).slice(0, 36);
+      items.people = raw.filter(function (entry) { return entry.media_type === 'person' && entry.name; }).sort(function (a, b) { return (b.popularity || 0) - (a.popularity || 0); }).map(function (entry) { return entry.name; });
+      return items;
     });
+  }
+  function fold(text) { return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l'); }
+  function match(name, query) {
+    var key = fold(name);query = fold(query).trim();
+    return key.indexOf(query) === 0 ? 0 : (' ' + key).indexOf(' ' + query) !== -1 ? 1 : key.indexOf(query) !== -1 ? 2 : 3;
+  }
+  function suggestions(items) {
+    var seen = {}, out = [];
+    if (!fold(view.query).trim()) return [];
+    items.map(function (item) { return item.title; }).concat(items.people || []).forEach(function (name) {
+      var key = fold(name);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      out.push({name:name, score:match(name, view.query), order:out.length});
+    });
+    return out.sort(function (a, b) { return a.score - b.score || a.order - b.order; }).slice(0, 5).map(function (s) { return s.name; });
+  }
+  function suggestionHTML(name) {
+    var query = fold(view.query).trim(), at = fold(name).indexOf(query);
+    if (!query || at === -1) return esc(name);
+    return esc(name.slice(0, at)) + '<b>' + esc(name.slice(at, at + query.length)) + '</b>' + esc(name.slice(at + query.length));
   }
   function fillSearch(items) {
     var html = '', tops = topIds(), grid = view.blocks[2], sugg = view.blocks[1];
@@ -608,10 +633,12 @@
     grid.el.innerHTML = items.length ? html : '<p class="empty" style="padding:0">Brak wyników. Spróbuj innego tytułu.</p>';
     grid.el.style.transform = '';
     grid.items = items;grid.cards = grid.el.querySelectorAll('.cd');grid.index = 0;
-    sugg.items = view.query ? items.map(function (item) { return item.title; }).filter(function (title, i, all) { return all.indexOf(title) === i; }).slice(0, 4) : [];
-    sugg.el.innerHTML = sugg.items.map(function (title) { return '<div>' + esc(title) + '</div>'; }).join('');
+    sugg.items = suggestions(items);
+    sugg.el.innerHTML = sugg.items.map(function (name) { return '<div>' + suggestionHTML(name) + '</div>'; }).join('');
     sugg.nodes = sugg.el.querySelectorAll('div');sugg.index = 0;
     if (focus.block > 0 && !view.blocks[focus.block].items.length) focus.block = 0;
+    if (view.toResults && items.length) focus.block = 2;
+    view.toResults = false;
     hydrate();
     if (ready) applyFocus();
   }
@@ -620,8 +647,8 @@
     heading.textContent = view.query || 'Popularne wyszukiwania';
     heading.classList.toggle('ph2', !view.query);
   }
-  function setQuery(query) {
-    view.query = query;
+  function setQuery(query, toResults) {
+    view.query = query;view.toResults = !!toResults;
     showQuery();
     clearTimeout(api.searchTimer);
     api.searchTimer = setTimeout(function () {
@@ -908,7 +935,7 @@
       setQuery(key === 'del' ? view.query.slice(0, -1) : (view.query + key).replace(/^ +/, ''));
       return true;
     }
-    if (block.type === 'sugg') { setQuery(block.items[block.index]); return true; }
+    if (block.type === 'sugg') { setQuery(block.items[block.index], true); return true; }
     var item = block.items[block.index];
     if (!item) return false;
     if (block.kind === 'cw' && item.entry) play(item, item.entry.season, item.entry.episode);
