@@ -129,10 +129,10 @@
   check('Back on the compact bar reveals full controls',RiveTV.revealPlayback()===true);
   await wait(200);state=await probe(frame);check('full controls follow the compact bar',state.visible&&!state.compact);
   await press('down');await press('right',6);await press('ok');state=await probe(frame);
-  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Wyłączone,English,Polski,Angielski,Czeski');
+  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Wyłączone,Angielski,Polski,Czeski');
   await press('down');await press('ok');frame.contentWindow.postMessage({fixture:'cue'},'*');await wait(200);state=await probe(frame);
   check('selected subtitle track is rendered by the overlay',state.modes.join()==='hidden,disabled'&&state.subtitle==='Hello world');
-  check('subtitle choice is remembered for next episodes',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='english');
+  check('subtitle choice is remembered for next episodes',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='angielski');
   check('Back closes the open panel first',RiveTV.revealPlayback()===true);await wait(200);
   state=await probe(frame);check('closing a panel returns focus to its button',!state.panel&&state.focus==='tracks');
   await press('right');await press('ok');await press('right');await press('ok');state=await probe(frame);
@@ -157,8 +157,8 @@
   check('movies have no episode buttons',state.rows.join()==='play,rewind,forward,volume,tracks,speed');
   check('subtitle search uses the TMDB id and stored key',subtitleQueries.indexOf('https://sub.wyzie.io/search?id=45745&key=fixture-key')!==-1);
   await press('right',4);await press('ok');state=await probe(frame);
-  check('subtitle panel adds deduplicated secure Wyzie languages',state.items.join()==='Wyłączone,English,Polski,Angielski,Czeski');
-  await press('down',4);await press('ok');frame.contentWindow.postMessage({fixture:'time',time:2},'*');await wait(1600);state=await probe(frame);
+  check('subtitle panel adds deduplicated secure Wyzie languages',state.items.join()==='Wyłączone,Angielski,Polski,Czeski');
+  await press('down',3);await press('ok');frame.contentWindow.postMessage({fixture:'time',time:2},'*');await wait(1600);state=await probe(frame);
   check('Wyzie subtitles in cp1250 are decoded and rendered',state.subtitle==='Žluťoučký kůň');
   check('Wyzie subtitle choice is remembered',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='czeski');
   frame.contentWindow.postMessage({fixture:'time',time:10},'*');await wait(1600);state=await probe(frame);

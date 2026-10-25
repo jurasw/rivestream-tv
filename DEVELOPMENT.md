@@ -28,6 +28,8 @@ Napisy strony pochodziły z `subs.1shows.app`, którego domena już nie istnieje
 
 „Preferowany język audio” (japoński, angielski, polski) wybiera pasującą ścieżkę, gdy strumień ma kilka (natywne `audioTracks`, hls.js, JW Player, Video.js). Wyszukiwanie serwera pomija serwer, którego ścieżki są oznaczone tylko innym językiem; gdy żaden nie pasuje, wraca do pierwszego działającego. Serwer bez oznaczenia języka jest akceptowany po 2,5 s, bo nie da się go rozpoznać. Serwery strony nie podają języka w nazwie, więc skuteczność zależy od tego, czy dostawca oznacza ścieżki.
 
+Od 1.9.2 panel „Audio / Napisy” zajmuje cały ekran jak w Netflixie: dwie kolumny z dużym tekstem, znacznik przy wybranej opcji i białe zaznaczenie fokusu. Nazwy języków ścieżek są po polsku, gdy ścieżka podaje kod języka.
+
 Od 1.9.1 panel „Audio / Napisy” mówi, czemu lista jest krótka: brak lub nieprawidłowy klucz Wyzie, brak napisów dla odcinka, błąd pobierania albo jedna ścieżka audio na serwerze.
 
 Testy: `scripts/test-playback.sh` (71 kontroli odtwarzacza, w tym napisy Wyzie z podstawionym API, 23 reklam i 4 wyszukiwania serwera po języku audio w `tests/servers.html`).
