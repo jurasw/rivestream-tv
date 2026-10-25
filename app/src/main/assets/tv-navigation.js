@@ -155,6 +155,14 @@
     var left = Math.max(0, Math.min(row.scrollWidth - row.clientWidth, row.scrollLeft + el.getBoundingClientRect().left - row.getBoundingClientRect().left - pad));
     if (Math.abs(row.scrollLeft - left) > 1) row.scrollTo({left:left, behavior:document.documentElement.hasAttribute('data-rive-repeat') ? 'auto' : 'smooth'});
   }
+  function rowNeighbor(el, step) {
+    var item = el.closest('[class*="watchlistItems__"]') || el;
+    for (var sibling = step < 0 ? item.previousElementSibling : item.nextElementSibling; sibling; sibling = step < 0 ? sibling.previousElementSibling : sibling.nextElementSibling) {
+      var card = sibling.matches('[class*="CardSmall__"]') ? sibling : sibling.querySelector('[class*="CardSmall__"]');
+      if (card && available(card)) {if (!card.hasAttribute('tabindex')) card.setAttribute('tabindex', '0');return card;}
+    }
+    return null;
+  }
   function setFocus(el, scroll, repeated) {
     if (!el) return false;
     if (window.RiveTVPlayback && RiveTVPlayback.hidden() && !el.closest('#rive-next-episode')) return false;
@@ -233,6 +241,10 @@
     var r = selected.getBoundingClientRect();
     var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     var horizontal = direction === 'left' || direction === 'right';
+    if (horizontal && selected.matches('[class*="CardSmall__"]')) {
+      var neighbor = rowNeighbor(selected, direction === 'left' ? -1 : 1);
+      if (neighbor) {setFocus(neighbor, true, repeated);return 'ok';}
+    }
     if (direction === 'left' && r.left < 65 && activeScope === document) return 'rail';
     var positive = direction === 'right' || direction === 'down';
     var best = null, bestScore = Infinity;
