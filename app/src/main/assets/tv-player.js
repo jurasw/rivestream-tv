@@ -67,6 +67,7 @@
     '.tracks{width:584px;max-height:568px;border-radius:4px;display:flex;gap:4px;overflow:hidden}.col{position:relative;width:312px}.col+.col{width:268px}' +
     '.col header{height:52px;padding:12px 10px 10px 40px;font-size:22px;line-height:22px;font-weight:500}.col .view{max-height:516px;padding-bottom:20px}' +
     '.col .view::after{content:"";position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(180deg,rgba(38,38,38,0),#262626);pointer-events:none}' +
+    '.note{padding:10px 20px 0 40px;font-size:16px;line-height:22px;color:#808080;white-space:normal}' +
     '.it{position:relative;height:56px;padding:0 20px 0 40px;font-size:20px;line-height:56px;color:#b3b3b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.it.f{color:#fff;background:rgba(255,255,255,.14)}.it.sel{color:#fff}.it svg{position:absolute;left:15px;top:22px;width:18px;height:13px;display:none}.it.sel svg{display:block}' +
     '.speed{width:840px;height:220px}.speed .h{position:absolute;left:30px;top:24px;line-height:45px}' +
@@ -644,6 +645,8 @@
         item.innerHTML = icons.check;item.appendChild(document.createTextNode(label));
         box.appendChild(item);
       });
+      var hint = col ? view && view.subtitleNote : source.items.length < 2 ? 'Ten serwer ma jedną ścieżkę audio. Inny język może być na innym serwerze.' : '';
+      if (hint) {var note = document.createElement('div');note.className = 'note';note.textContent = hint;box.appendChild(note);}
       scrollList(box,col === panelCol ? box.children[panelIndex] : null,496);
     });
   }
@@ -901,11 +904,16 @@
     var key = playback().subtitleKey ? playback().subtitleKey() : '';
     var route = [info.type,info.id,info.season,info.episode,key].join(':');
     if (subtitleSearch.route === route) return subtitleSearch.items;
-    var search = subtitleSearch = {route:route,items:[]};
-    if (!key) return search.items;
+    var search = subtitleSearch = {route:route,items:[],note:'Szukam napisów…'};
+    if (!key) {search.note = 'Dodaj klucz Wyzie w Ustawieniach, żeby zobaczyć więcej napisów.';return search.items;}
     var url = 'https://sub.wyzie.io/search?id=' + encodeURIComponent(info.id) + (info.type === 'tv' ? '&season=' + encodeURIComponent(info.season) + '&episode=' + encodeURIComponent(info.episode) : '') + '&key=' + encodeURIComponent(key);
-    fetch(url).then(function (response) {return response.ok ? response.json() : [];}).then(function (list) {
-      if (subtitleSearch !== search || !Array.isArray(list)) return;
+    fetch(url).then(function (response) {
+      if (response.status === 401 || response.status === 403) search.note = 'Nieprawidłowy klucz Wyzie. Sprawdź go w Ustawieniach.';
+      return response.ok ? response.json() : [];
+    }).then(function (list) {
+      if (subtitleSearch !== search) return;
+      if (!Array.isArray(list)) {if (search.note === 'Szukam napisów…') search.note = 'Nie udało się pobrać listy napisów.';return;}
+      if (search.note === 'Szukam napisów…') search.note = list.length ? '' : 'Brak napisów dla tego odcinka.';
       var seen = {};
       list.forEach(function (entry) {
         if (!entry || typeof entry.url !== 'string' || entry.url.indexOf('https://') !== 0) return;
@@ -921,7 +929,7 @@
         return (ra === -1 ? 9 : ra) - (rb === -1 ? 9 : rb) || a.label.localeCompare(b.label,'pl');
       });
       search.items = search.items.slice(0,40);
-    }).catch(function () {});
+    }).catch(function () {if (subtitleSearch === search) search.note = 'Nie udało się pobrać listy napisów.';});
     return search.items;
   }
   function decodeSubtitles(buffer,encoding) {
@@ -974,7 +982,7 @@
       episodeTitle:current ? current.title : '',synopsis:current && current.synopsis || text(details.overview,400),
       tagline:text(details.tagline,120),still:current ? current.still : '',backdrop:still(details.backdrop_path),
       hasNext:info.hasNext,next:info.hasNext ? next : null,episodes:episodes,subtitles:info.subtitles,audioLanguage:info.audioLanguage,
-      external:externalSubtitles(info).map(function (item) {return item.label;})};
+      external:externalSubtitles(info).map(function (item) {return item.label;}),subtitleNote:subtitleSearch.note || ''};
   }
   function rootTick() {
     var next = buildView();
