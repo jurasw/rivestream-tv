@@ -37,6 +37,12 @@
   check('unlabelled audio is accepted after a short wait',state.phase==='done'&&/^Server 2/.test(state.label)&&Date.now()-began>=2500);
   preference='';state=await run(4,['other','match','match']);
   check('no preference keeps the first working server',state.phase==='done'&&/^Server 2/.test(state.label));
+  preference='en';audio=['unknown','unknown','match'];RiveTVServers.find();await wait(700);
+  for (var i=0;i<100&&RiveTVServers.state().phase!=='done';i++) await wait(200);
+  state=RiveTVServers.state();check('choosing a language finds a server with that labelled track',state.phase==='done'&&/^Server 3/.test(state.label));
+  audio=['unknown','unknown','unknown'];RiveTVServers.find();await wait(700);
+  for (var j=0;j<150&&RiveTVServers.state().phase!=='done';j++) await wait(200);
+  state=RiveTVServers.state();check('without a match the language search returns to the previous server',state.phase==='done'&&/^Server 3/.test(state.label));
  } catch (error) {results.push('FAIL '+error.stack);}
  document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
 })();

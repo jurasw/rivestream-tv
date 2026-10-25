@@ -142,6 +142,18 @@
     show();
     status('Szukam najlepszego serwera…');
   }
+  function find() {
+    if (!search || !search.labels || location.pathname !== '/watch') return false;
+    var current = search.current;
+    var order = search.labels.map(function (_, index) { return index; }).filter(function (index) { return index !== current; }).slice(0, 10);
+    search = {route:search.route, phase:'switching', began:Date.now(), labels:search.labels, order:order, pos:0, tried:[], current:-1, switchedAt:0, workingAt:0,
+      fallback:current, final:false, strict:true};
+    button = 0;
+    show();
+    status('Szukam serwera z wybranym językiem audio…');
+    next();
+    return true;
+  }
   function stop() {
     if (search) search.phase = 'off';
     search = null;
@@ -185,13 +197,14 @@
     if (!search.workingAt) search.workingAt = Date.now();
     var found = audio();
     if (found === 'match') return true;
-    if (found === 'other') {
+    var waited = Date.now() - search.workingAt > AUDIO_WAIT;
+    if (found === 'other' || (search.strict && waited)) {
       if (search.fallback === -1) search.fallback = search.current;
       status('Szukam serwera z wybranym językiem audio…');
       next();
       return false;
     }
-    return Date.now() - search.workingAt > AUDIO_WAIT;
+    return !search.strict && waited;
   }
   function blocked() {
     if (!window.RiveTVAds || !RiveTVAds.captcha) return false;
@@ -203,10 +216,12 @@
     search.phase = 'done';
     var text = search.labels[search.current];
     if (number(text)) localStorage.setItem('RiveTVLastServer', String(number(text)));
-    status('Gotowe');
     var state = RiveTVPlayback.state();
     if (state && state.paused) RiveTVPlayback.command('play');
-    hide(true);
+    if (search.strict && search.final) {
+      status('Żaden serwer nie ma ścieżki w wybranym języku. Wracam do poprzedniego.');
+      setTimeout(function () { hide(true); }, 3000);
+    } else { status('Gotowe'); hide(true); }
   }
   function fail() {
     search.phase = 'failed';search.current = -1;
@@ -270,7 +285,7 @@
     nav[name] = function () { return searching() ? api[name].apply(null, arguments) : original[name] ? original[name].apply(nav, arguments) : false; };
   });
   original.sources = nav.sources;
-  window.RiveTVServers = {searching:searching, state:function () {
+  window.RiveTVServers = {searching:searching, find:find, state:function () {
     return search && {phase:search.phase, current:search.current, label:search.labels && search.labels[search.current], tried:search.tried.length, total:search.order.length};
   }};
   setInterval(tick, 300);

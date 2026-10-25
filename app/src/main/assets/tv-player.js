@@ -446,7 +446,7 @@
   }
   function openPanel(name,inside) {
     panel = name;zone = inside ? 'panel' : 'row';panelIndex = 0;nextPreview = false;
-    if (name === 'tracks') {audioList = audioSource();subList = subtitleSource();panelCol = subList.items.length > 1 || audioList.items.length < 2 ? 1 : 0;panelIndex = Math.max(0,(panelCol ? subList : audioList).current);}
+    if (name === 'tracks') {audioList = audioMenu();subList = subtitleSource();panelCol = subList.items.length > 1 || audioList.items.length < 2 ? 1 : 0;panelIndex = Math.max(0,(panelCol ? subList : audioList).current);}
     if (name === 'speed') panelIndex = speedIndex = Math.max(0,RATES.indexOf(video.playbackRate));
     if (name === 'episodes' && view) panelIndex = Math.max(0,view.episodes.findIndex(function (item) {return String(item.episode) === String(view.episode);}));
     renderChrome();arm();report();
@@ -572,7 +572,7 @@
       } else if (key === 'ok') {
         source.select(panelIndex);
         if (panelCol) act('subtitles',{value:panelIndex ? subList.items[panelIndex].toLowerCase() : 'off'});
-        audioList = audioSource();subList = subtitleSource();
+        audioList = audioMenu();subList = subtitleSource();
       }
       renderTracks();return true;
     }
@@ -637,7 +637,7 @@
     box.style.transform = 'translateY(' + (-offset) + 'px)';
   }
   function renderTracks() {
-    if (!audioList) audioList = audioSource();
+    if (!audioList) audioList = audioMenu();
     if (!subList) subList = subtitleSource();
     [audioList,subList].forEach(function (source,col) {
       var box = el.cols[col].querySelector('.list');box.textContent = '';
@@ -646,7 +646,7 @@
         item.innerHTML = icons.check;item.appendChild(document.createTextNode(label));
         box.appendChild(item);
       });
-      var hint = col ? view && view.subtitleNote : source.items.length < 2 ? 'Ten serwer ma jedną ścieżkę audio. Inny język może być na innym serwerze.' : '';
+      var hint = col ? view && view.subtitleNote : source.items.some(function (name) {return / — szukaj serwera$/.test(name);}) ? 'Ten serwer nie ma tej wersji językowej. Wybierz ją, a poszukam jej na innych serwerach.' : '';
       if (hint) {var note = document.createElement('div');note.className = 'note';note.textContent = hint;box.appendChild(note);}
       scrollList(box,col === panelCol ? box.children[panelIndex] : null,486);
     });
@@ -721,6 +721,17 @@
       }
     } catch (_) {}
     return out.filter(function (value) {return /\S/.test(value);});
+  }
+  function audioMenu() {
+    var source = audioSource(), langs = audioLanguages(), extra = [];
+    ['en','ja'].forEach(function (code) {
+      if (!langs.some(function (value) {return AUDIO_MATCH[code].test(value.trim());})) extra.push(code);
+    });
+    return {items:source.items.concat(extra.map(function (code) {return languageName(code,code) + ' — szukaj serwera';})),current:source.current,select:function (index) {
+      if (index < source.items.length) {source.select(index);return;}
+      act('findAudio',{value:extra[index - source.items.length]});
+      closePanel();hideControls();
+    }};
   }
   function audioMatch() {
     var wanted = view && AUDIO_MATCH[view.audioLanguage], langs = audioLanguages();
@@ -832,7 +843,7 @@
   function status() {
     var match = video ? audioMatch() : null;
     return {riveTV:'overlay',id:id,active:!!(video && sessionId && host),visible:visible && !compact || errorShown(),panel:visible ? panel : null,ready:!!view,
-      audio:match === null ? 'unknown' : match === -1 ? 'other' : 'match'};
+      audio:match === null ? 'unknown' : match === -1 ? 'other' : 'match',langs:video ? audioLanguages().slice(0,6) : []};
   }
   function report(force) {
     if (root) return;
@@ -1009,6 +1020,10 @@
     if (message.action === 'next') playback().next();
     else if (message.action === 'cancelNext') playback().cancelNext();
     else if (message.action === 'subtitles') playback().subtitles(typeof message.value === 'string' ? message.value.slice(0,80) : null);
+    else if (message.action === 'findAudio' && ['en','ja','pl'].indexOf(message.value) !== -1) {
+      if (playback().setAudioLanguage) playback().setAudioLanguage(message.value);
+      if (window.RiveTVServers && window.RiveTVServers.find) window.RiveTVServers.find();
+    }
     else if (message.action === 'externalSub' && typeof message.index === 'number' && typeof message.label === 'string') loadSubtitle(message.index,message.label,frame);
     else if (message.action === 'site') {if (window.RiveTV && window.RiveTV.siteControls) window.RiveTV.siteControls(true);else playback().reveal();}
     else if (message.action === 'exit') {playback().flush();if (window.next && window.next.router) window.next.router.push('/');else location.assign('/');}
@@ -1051,13 +1066,14 @@
       if (msg.active !== true && !(remote && remote.id === msg.id)) return;
       if (msg.ready !== true && rootView) down({riveTV:'view',view:rootView});
       remote = {id:msg.id,active:msg.active === true,visible:msg.visible === true,panel:typeof msg.panel === 'string' ? msg.panel : null,frame:frame,received:Date.now(),session:session(),
-        audio:['match','other'].indexOf(msg.audio) !== -1 ? msg.audio : 'unknown'};
+        audio:['match','other'].indexOf(msg.audio) !== -1 ? msg.audio : 'unknown',
+        langs:Array.isArray(msg.langs) ? msg.langs.slice(0,6).map(function (value) {return text(value,80);}) : []};
     } else if (remote && remote.frame === frame && remote.id === msg.id) perform(msg,frame);
   });
   window.RiveTVPlayer = {
     active:function () {return root && !!(playback() && playback().isWatch() && current());},
     owns:function () {return this.active() && playback().hidden();},
-    status:function () {var value = current();return value ? {id:value.id,local:!!value.local,visible:value.visible,panel:value.panel,audio:value.audio || 'unknown'} : null;},
+    status:function () {var value = current();return value ? {id:value.id,local:!!value.local,visible:value.visible,panel:value.panel,audio:value.audio || 'unknown',langs:value.langs || []} : null;},
     key:function (key,repeat) {
       var target = current();
       if (!target) return false;
