@@ -74,15 +74,11 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     static final String[] AD_HOSTS={"adsco.re","cdn4ads.com","llvpn.com","luugy.com","rtmark.net","rapidadexchange.com","adexchangerapid.com","usrpubtrck.com","usrpubtrk.com","intellipopup.com","histats.com","predictivdisplay.com","trackzonas.com","rlsredirect.com","misradstore.com","panterlorius.com","cokedpariti.com","unlaxguttus.com","urbanfungose.com","mc.yandex.ru","mc.yandex.com","clarity.ms"};
     static boolean adHost(String host){if(host==null)return false;host=host.toLowerCase(java.util.Locale.ROOT);for(String ad:AD_HOSTS)if(host.equals(ad)||host.endsWith("."+ad))return true;return false;}
     private static final String ASSET_HOST = "rivetv.assets";
+    private static final int VOICE_SEARCH = 7;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final ArrayList<Button> navButtons = new ArrayList<>();
     private WebView web;
     private FrameLayout root, content;
-    private LinearLayout rail, loading;
-    private LinearLayout identity;
-    private TextView brand;
-    private Button controls;
-    private boolean railExpanded=true;
+    private LinearLayout loading;
     private SpinnerView progress;
     private Typeface interRegular, interMedium, interBold;
     private TextView status;
@@ -92,14 +88,11 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private String navigationScript, bootstrapScript, compatibilityScript;
     private ViewingStore viewingStore;
     private androidx.webkit.ScriptHandler storageBootstrap;
-    private ValueAnimator railAnimator;
-    private float railReveal=1f;
     private int pageGeneration;
     private long loadingStarted;
     private String loadingUrl;
     private boolean documentStartSupported;
     private boolean pointerMode, centerLongPress, pageFailed, backPressedHere, backForKeyboard;
-    private Button lastNav;
     private Dialog activeDialog;
     private TextView notice, errorText;
     private LinearLayout errorBar;
@@ -130,34 +123,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         root.setBackgroundColor(0xff141414);
         FrameLayout layout = new FrameLayout(this);
         root.addView(layout, new FrameLayout.LayoutParams(-1,-1));
-        rail = new LinearLayout(this);
-        rail.setOrientation(LinearLayout.VERTICAL);
-        rail.setPadding(dp(14),dp(28),dp(14),dp(18));
-        rail.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xff000000,0xff141414}));
-        rail.setClipChildren(true);
-        identity=new LinearLayout(this);identity.setGravity(Gravity.CENTER_VERTICAL);identity.setPadding(dp(14),0,0,0);
-        ImageView mark=new ImageView(this);mark.setImageResource(R.drawable.rive_mark);
-        identity.addView(mark,new LinearLayout.LayoutParams(dp(28),dp(28)));
-        brand=label("RIVESTREAM",16,Color.WHITE);
-        brand.setTypeface(interBold);brand.setLetterSpacing(.02f);brand.setTextSize(14);brand.setSingleLine(true);
-        brand.setPadding(dp(7),0,0,0);identity.addView(brand);
-        LinearLayout.LayoutParams identityParams=new LinearLayout.LayoutParams(dp(152),dp(28));identityParams.bottomMargin=dp(40);rail.addView(identity,identityParams);
-        addNav("Start", "");
-        addNav("Szukaj", "search");
-        addNav("Filmy", "movie");
-        addNav("Seriale", "tv");
-        addNav("Biblioteka", "library");
-        addNav("Ustawienia", "settings");
-        rail.addView(new View(this),new LinearLayout.LayoutParams(1,0,1));
-        controls=configureButton(new RailButton("menu"),"Menu pilota");
-        controls.setPadding(dp(56),0,dp(12),0);
-        attachRailKeys(controls);
-        controls.setOnClickListener(v->showMenu());
-        rail.addView(controls,new LinearLayout.LayoutParams(-1,dp(42)));
         content = new FrameLayout(this);
-        FrameLayout.LayoutParams contentParams=new FrameLayout.LayoutParams(-1,-1);contentParams.leftMargin=dp(84);
-        layout.addView(content,contentParams);
-        layout.addView(rail,new FrameLayout.LayoutParams(dp(180),-1));
+        layout.addView(content,new FrameLayout.LayoutParams(-1,-1));
         web=new TvWebView();
         web.setBackgroundColor(0xff141414);
         content.addView(web,new FrameLayout.LayoutParams(-1,-1));
@@ -191,7 +158,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             refreshStorageBootstrap();
         }
         navigationScript=compatibilityScript+"\n"+bootstrapScript+"\nwindow.RiveTVTheme="+JSONObject.quote(readAsset("tv-theme.css"))+";\n"+readAsset("tv-navigation.js")+"\n"+readAsset("tv-shell.js")+"\n"+readAsset("tv-servers.js");
-        web.setOnFocusChangeListener((v,focus)->{if(focus)setRailExpanded(false);else stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
+        web.setOnFocusChangeListener((v,focus)->{if(!focus)stopArrowNavigation();syncWebFocus(focus && !pointerMode);});
         cursor=new CursorView();
         cursor.setVisibility(View.GONE);
         content.addView(cursor,new FrameLayout.LayoutParams(-1,-1));
@@ -283,7 +250,6 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             @Override public void onPageFinished(WebView w,String url){
                 if(pageFailed) return;
                 if(isRive(Uri.parse(url)))injectNavigation(w);else loading.setVisibility(View.GONE);
-                if(lastNav==null){lastNav=navButtons.get(0);web.requestFocus();}
             }
             @Override public void doUpdateVisitedHistory(WebView w,String url,boolean reload){updateNavigation(url);if(!url.equals(loadingUrl))beginLoading(url);}
             @Override public void onReceivedError(WebView w,WebResourceRequest req,WebResourceError error){
@@ -328,24 +294,12 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         setContentView(root);
         web.requestFocus();
         if(state==null || web.restoreState(state)==null)web.loadUrl(HOME);
-        navButtons.get(0).setSelected(true);
         updater=new AppUpdater(this,this);
         android.content.SharedPreferences updates=getSharedPreferences(AppUpdater.PREFS,MODE_PRIVATE);
         String updateMessage=getIntent().getStringExtra("update_message");if(updateMessage==null)updateMessage=updates.getString("completion_message",null);
         if(updateMessage!=null){showNotice(updateMessage);updates.edit().remove("completion_message").apply();}
     }
 
-    private void addNav(String title,String path){
-        Button b=configureButton(new RailButton(path),title);
-        b.setPadding(dp(56),0,dp(12),0);
-        attachRailKeys(b);
-        b.setOnClickListener(v->{
-            for(Button n:navButtons)n.setSelected(n==b);
-            lastNav=b; hideFullscreen();web.loadUrl(HOME+path);web.requestFocus();
-        });
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(43));lp.bottomMargin=dp(4);
-        rail.addView(b,lp);navButtons.add(b);
-    }
     private void updateNavigation(String url){
         Uri uri=Uri.parse(url);
         if(!isRive(uri))return;
@@ -353,13 +307,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         boolean watch="/watch".equals(path);
         if(watchQuick!=null)watchQuick.setVisibility(watch && pageFailed?View.VISIBLE:View.GONE);
         if(errorPlayback!=null)errorPlayback.setVisibility(watch?View.VISIBLE:View.GONE);
-        boolean shell=java.util.Arrays.asList("/","/movie","/tv","/library","/search","/detail").contains(path==null||path.isEmpty()?"/":path);
-        rail.setVisibility(watch||shell?View.GONE:View.VISIBLE);
-        FrameLayout.LayoutParams contentParams=(FrameLayout.LayoutParams)content.getLayoutParams();
-        int margin=watch||shell?0:dp(84);if(contentParams.leftMargin!=margin){contentParams.leftMargin=margin;content.setLayoutParams(contentParams);}
         if(watch)web.requestFocus();
-        String[] paths={"/","/search","/movie","/tv","/library","/settings"};
-        for(int i=0;i<navButtons.size();i++)navButtons.get(i).setSelected(paths[i].equals(path));
     }
     private Button makeButton(String title){
         Button b=configureButton(new Button(this),title);
@@ -377,58 +325,9 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         b.setCompoundDrawableTintList(null);
         b.setPadding(dp(18),0,dp(12),0);
         b.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{android.R.attr.state_selected},new int[]{}},new int[]{Color.WHITE,Color.WHITE,0xffe5e5e5}));
-        b.setOnFocusChangeListener((v,focus)->{if(focus && navButtons.contains(b))lastNav=b;});
         return b;
     }
     private void syncWebFocus(boolean focused){if(web!=null)web.evaluateJavascript("window.RiveTV && RiveTV."+(focused?"resume":"suspend")+"()",null);}
-    private void setRailExpanded(boolean expanded){
-        if(railExpanded==expanded)return;
-        railExpanded=expanded;
-        if(railAnimator!=null)railAnimator.cancel();
-        railAnimator=ValueAnimator.ofFloat(railReveal,expanded?1f:0f);
-        railAnimator.setDuration(240);
-        railAnimator.setInterpolator(new DecelerateInterpolator());
-        railAnimator.addUpdateListener(animation->{
-            railReveal=(float)animation.getAnimatedValue();
-            ViewGroup.LayoutParams params=rail.getLayoutParams();params.width=dp(84)+Math.round(dp(96)*railReveal);rail.setLayoutParams(params);
-            brand.setAlpha(railReveal);
-            for(Button b:navButtons)b.invalidate();controls.invalidate();
-        });
-        railAnimator.start();
-    }
-    /** Keep icons independent of TextView's drawable cache while labels change. */
-    private final class RailButton extends Button{
-        private final TvIconDrawable icon;
-        private final Paint underline=new Paint();
-        RailButton(String path){super(MainActivity.this);icon=new TvIconDrawable(MainActivity.this,path);}
-        @Override protected void onDraw(Canvas canvas){
-            int layer=canvas.saveLayerAlpha(0,0,getWidth(),getHeight(),Math.round(255*railReveal));
-            super.onDraw(canvas);
-            if(isFocused()){
-                float width=Math.min(getPaint().measureText(getText().toString()),getWidth()-getTotalPaddingLeft()-getTotalPaddingRight());
-                float top=getBaseline()+dp(5);
-                underline.setColor(0xffe50914);
-                canvas.drawRect(getTotalPaddingLeft(),top,getTotalPaddingLeft()+width,top+dp(2),underline);
-            }
-            canvas.restoreToCount(layer);
-            int size=dp(18),left=dp(19),top=(getHeight()-size)/2;
-            icon.setBounds(left,top,left+size,top+size);icon.setState(getDrawableState());icon.draw(canvas);
-        }
-        @Override protected void drawableStateChanged(){
-            super.drawableStateChanged();
-            Typeface face=isFocused()||isSelected()?interMedium:interRegular;
-            if(getTypeface()!=face)setTypeface(face);
-        }
-    }
-    private void attachRailKeys(Button b){
-        b.setOnFocusChangeListener((v,focus)->{if(focus){setRailExpanded(true);if(navButtons.contains(b))lastNav=b;syncWebFocus(false);}});
-        b.setOnKeyListener((v,key,event)->{
-            if(key==KeyEvent.KEYCODE_DPAD_RIGHT){
-                if(event.getAction()==KeyEvent.ACTION_DOWN){web.requestFocus();syncWebFocus(!pointerMode);}
-                return true;
-            }return false;
-        });
-    }
     private TextView label(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setTypeface(interRegular);return t;}
     private void beginLoading(String url){
         if(searchEditor!=null)finishKeyboardEditing();
@@ -612,7 +511,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     }
     private void showAppMenu(){
         if(keyboardOpen())finishKeyboardEditing();
-        String[] actions={"Strona główna","Szukaj",pointerMode?"Wyłącz kursor":"Włącz kursor","Odśwież stronę","Pokaż / ukryj menu boczne","Aktualizacje · "+BuildConfig.VERSION_NAME,"Sterowanie i informacje"};
+        String[] actions={"Strona główna","Szukaj",pointerMode?"Wyłącz kursor":"Włącz kursor","Odśwież stronę","Aktualizacje · "+BuildConfig.VERSION_NAME,"Sterowanie i informacje"};
         Runnable[] callbacks=new Runnable[actions.length];
         for(int i=0;i<actions.length;i++){final int index=i;callbacks[i]=()->{
             switch(index){
@@ -620,8 +519,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 case 1: hideFullscreen();web.loadUrl(HOME+"search");web.requestFocus();break;
                 case 2:togglePointer();break;
                 case 3:web.reload();web.requestFocus();break;
-                case 4:rail.setVisibility(rail.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);web.requestFocus();break;
-                case 5:updater.check(true);break;
+                case 4:updater.check(true);break;
                 default:showHelp();
             }
         };}
@@ -802,14 +700,12 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         final int key=heldArrow,generation=arrowGeneration;
         final boolean repeated=arrowRepeated;arrowRepeated=true;arrowInFlight=true;
         String direction=key==19?"up":key==20?"down":key==21?"left":"right";
-        String fallback=key==KeyEvent.KEYCODE_DPAD_LEFT && rail.getVisibility()==View.VISIBLE?"rail":"native";
         long deadline=System.currentTimeMillis()+350;
-        web.evaluateJavascript("Date.now()>"+deadline+" ? 'stale' : (window.RiveTV ? RiveTV.move('"+direction+"',"+repeated+") : '"+fallback+"')",result->{
+        web.evaluateJavascript("Date.now()>"+deadline+" ? 'stale' : (window.RiveTV ? RiveTV.move('"+direction+"',"+repeated+") : 'native')",result->{
             arrowInFlight=false;
             if(web==null)return;
             if(generation!=arrowGeneration){if(heldArrow!=0)handler.post(repeatArrow);return;}
-            if("\"rail\"".equals(result) && rail.getVisibility()==View.VISIBLE){stopArrowNavigation();setRailExpanded(true);(lastNav==null?navButtons.get(0):lastNav).requestFocus();}
-            else if("\"edge-up\"".equals(result) && errorBar.getVisibility()==View.VISIBLE){stopArrowNavigation();errorRetry.requestFocus();}
+            if("\"edge-up\"".equals(result) && errorBar.getVisibility()==View.VISIBLE){stopArrowNavigation();errorRetry.requestFocus();}
             else if("\"edge-right\"".equals(result) && watchQuick.getVisibility()==View.VISIBLE){stopArrowNavigation();watchQuick.requestFocus();}
             else if("\"native\"".equals(result)){web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,key));web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,key));}
             if(heldArrow!=0)handler.postDelayed(repeatArrow,repeated?150:300);
@@ -863,9 +759,24 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                         keyboardRequested=true;
                         handler.postDelayed(()->requestKeyboard(0),80);
                     }
-                }else web.evaluateJavascript("window.RiveTV && RiveTV.activate()",result->{if("\"dropdown\"".equals(result))handler.postDelayed(()->showCustomSelect(0),20);});
+                }else web.evaluateJavascript("window.RiveTV && RiveTV.activate()",result->{if("\"dropdown\"".equals(result))handler.postDelayed(()->showCustomSelect(0),20);else if("\"voice\"".equals(result))startVoiceSearch();});
             }catch(Exception ignored){web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER));web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER));}
         });
+    }
+    private void startVoiceSearch(){
+        android.content.Intent intent=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH);
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,"pl-PL");
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT,"Powiedz tytuł filmu lub serialu");
+        intent.setPackage("com.google.android.katniss");
+        if(intent.resolveActivity(getPackageManager())==null)intent.setPackage(null);
+        try{startActivityForResult(intent,VOICE_SEARCH);}catch(android.content.ActivityNotFoundException e){showNotice("Wyszukiwanie głosowe jest niedostępne na tym telewizorze.");}
+    }
+    @Override protected void onActivityResult(int request,int result,android.content.Intent data){
+        super.onActivityResult(request,result,data);
+        if(request!=VOICE_SEARCH || result!=RESULT_OK || data==null || web==null)return;
+        ArrayList<String> matches=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);
+        if(matches!=null && !matches.isEmpty())web.evaluateJavascript("window.RiveTV && RiveTV.search("+JSONObject.quote(matches.get(0))+")",null);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event){
         int key=event.getKeyCode();boolean down=event.getAction()==KeyEvent.ACTION_DOWN;
@@ -949,7 +860,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);if(web!=null)web.saveState(state);}
     @Override protected void onPause(){if(updater!=null)updater.onPause();keyboardRequested=false;backPressedHere=false;centerPressedHere=false;stopArrowNavigation();arrowGeneration++;handler.removeCallbacks(longPress);if(web!=null){web.evaluateJavascript("window.RiveTV && RiveTV.media('pause')",null);web.onPause();}CookieManager.getInstance().flush();super.onPause();}
     @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();if(updater!=null)updater.onResume();}
-    @Override protected void onDestroy(){if(updater!=null)updater.close();handler.removeCallbacksAndMessages(null);if(railAnimator!=null)railAnimator.cancel();if(web!=null){web.stopLoading();content.removeView(web);web.destroy();web=null;}super.onDestroy();}
+    @Override protected void onDestroy(){if(updater!=null)updater.close();handler.removeCallbacksAndMessages(null);if(web!=null){web.stopLoading();content.removeView(web);web.destroy();web=null;}super.onDestroy();}
     private final class SpinnerView extends View{
         final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF arc=new RectF();
         final ObjectAnimator spin=ObjectAnimator.ofFloat(this,View.ROTATION,0f,360f);

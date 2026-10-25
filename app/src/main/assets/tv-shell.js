@@ -6,6 +6,7 @@
   var ASSETS = 'https://rivetv.assets/';
   var LANG = 'pl-PL';
   var ROW_Y = 500, GRID_Y = 260, COLUMNS = 6;
+  var KEYS = 'abcdefghijklmnopqrstuvwxyz1234567890'.split('');
   var NAV = [
     {id:'home', label:'Strona główna'},
     {id:'tv', label:'Seriale'},
@@ -28,6 +29,9 @@
     thumb:'<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M10.98 5.38V8c0 .17-.03.35-.1.52-1.17 2.63-2.89 3.93-4.53 4.22-.04 0-.08.03-.1.05v4.24h.03c1.35-.08 2.22.07 2.9.3.32.11.6.24.82.35l.06.03c.2.1.35.17.52.23.09.03.36.07.84.1.45.02 1 .02 1.6 0 1.18-.01 2.48-.08 3.32-.13h.04c.09 0 .15-.01.18-.02l.06-.12c.05-.23 0-.56-.07-.95-.08-.43.14-.8.43-1 .5-.33.52-.74.47-.87-.08-.25-.11-.63.1-.96.21-.33.2-.54.17-.68-.04-.16-.14-.31-.3-.46a1.04 1.04 0 0 1-.18-1.24c.08-.16.08-.27.07-.34-.01-.08-.06-.16-.14-.26a1.3 1.3 0 0 0-.4-.29h-3.42V8.47c0-1.96-.45-2.7-.83-2.97-.38-.28-.91-.27-1.54-.12zm2.27-.92c.88.65 1.35 1.92 1.35 4.01v.96h2.22c.14 0 .26.04.35.07.1.03.2.08.3.14.2.11.43.27.63.5.2.22.38.52.45.89.06.33.02.68-.12 1.02.2.23.42.54.52.95.12.5.04 1.04-.29 1.6.21.71-.07 1.6-.84 2.19.06.34.12.82.04 1.25-.06.28-.19.6-.47.83-.28.24-.62.33-1 .34-.85.05-2.16.12-3.36.14-.6.01-1.19 0-1.67-.02-.46-.02-.91-.06-1.2-.16-.23-.08-.45-.19-.64-.29l-.06-.03a5.6 5.6 0 0 0-.68-.29c-.49-.17-1.2-.3-2.43-.23A1.27 1.27 0 0 1 5 17.03V12.8c0-.72.56-1.22 1.13-1.32 1.15-.21 2.57-1.15 3.6-3.49V5.37c0-.57.38-1.1.96-1.24.66-.15 1.7-.3 2.56.33z" fill="currentColor"/></svg>',
     caret:'<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" fill="currentColor"/></svg>',
     search:'<svg viewBox="0 0 24 24" fill="none"><circle cx="10.7" cy="10.7" r="7.83" stroke="currentColor" stroke-width="1.74"/><path d="M21.56 22l-5.96-6.03" stroke="currentColor" stroke-width="1.74"/></svg>',
+    mic:'<svg viewBox="0 0 24 24" fill="none"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill="currentColor"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    space:'<svg viewBox="0 0 24 24" fill="none"><path d="M3 10v4.5h18V10" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+    del:'<svg viewBox="0 0 24 24" fill="none"><path d="M8.5 5H21v14H8.5L2 12z" fill="currentColor"/><path d="M11.5 9l6 6m0-6l-6 6" stroke="#2a2a2a" stroke-width="1.8"/></svg>',
     bell:'<svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5c-3.2 0-5.6 2.5-5.6 5.7v3.6L4.6 16v1h14.8v-1l-1.8-3.2V9.2c0-3.2-2.4-5.7-5.6-5.7zM9.7 19.2a2.4 2.4 0 0 0 4.6 0" stroke="currentColor" stroke-width="1.6"/></svg>',
     close:'<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#181818"/><path fill-rule="evenodd" d="M17.18 18l-5.09-5.09 1.13-1.13 5.09 5.09 5.1-5.09 1.13 1.13L19.45 18l5.09 5.09-1.13 1.13-5.09-5.09-5.1 5.09-1.13-1.13z" fill="#fff"/></svg>',
     mute:'<svg viewBox="0 0 24 24" fill="none"><path d="M11 5L6.5 8.6H3.5v6.8h3L11 19z" stroke="currentColor" stroke-width="1.5"/><path d="M15 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.5"/></svg>',
@@ -107,8 +111,16 @@
     '.dd i{display:block;width:22px;height:22px;flex:none}.dd.f{background:#fff;color:#000}' +
     '.grid{display:flex;flex-wrap:wrap;gap:64px 6px;padding:10px 58px 80px}.grid .cd{width:214px;height:121px}' +
     '.empty{padding:40px 58px;font-size:22px;line-height:30px;color:#b3b3b3}' +
-    '.sbox{display:flex;align-items:center;gap:14px;width:640px;height:64px;margin:0 58px 34px;padding:0 20px;background:rgba(0,0,0,.5);border:1px solid #808080;border-radius:4px;font-size:22px;color:#808080;transition:border-color .1s,box-shadow .1s}' +
-    '.sbox svg{width:28px;height:28px;flex:none;color:#b3b3b3}.sbox.has{color:#fff}.sbox.f{border-color:#fff;box-shadow:0 0 0 2px #fff}' +
+    '.kb{position:absolute;left:58px;top:118px;width:396px}' +
+    '.kr{display:flex;gap:6px;margin-bottom:6px}.kg{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}' +
+    '.k{position:relative;height:56px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#2a2a2a;color:#e5e5e5;font-size:24px;line-height:1;transition:background-color .1s,color .1s,transform .15s}' +
+    '.kr .k{flex:1}.k svg{width:26px;height:26px}.k.f{background:#fff;color:#000;transform:scale(1.06);z-index:1}' +
+    '.k.mic{color:#fff;background:linear-gradient(135deg,#f69b65,#ed5c91 55%,#ef009d)}.k.mic.f{background:#fff;color:#ed5c91}' +
+    '.sug{margin-top:26px}.sug div{padding:9px 14px;margin:0 -14px;border-radius:4px;font-size:20px;line-height:26px;color:#b3b3b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sug div.f{background:#fff;color:#000}' +
+    '.sr{position:absolute;left:496px;top:118px;width:944px;height:calc(var(--h,810px) - 118px)}' +
+    '.sq{height:46px;margin-bottom:22px;font-size:34px;line-height:46px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sq.ph2{font-size:26px;font-weight:400;color:#808080}' +
+    '.gw{position:absolute;left:-20px;top:58px;right:0;bottom:0;overflow:hidden}' +
+    '.sr .grid{position:relative;padding:12px 58px 80px 20px;gap:56px 6px;transition:transform .3s cubic-bezier(.25,.1,.25,1)}' +
     '.ov{position:absolute;inset:0;z-index:10;background:rgba(0,0,0,.7);opacity:0;visibility:hidden;transition:opacity .25s,visibility 0s .25s}.ov.on{opacity:1;visibility:visible;transition:opacity .25s}' +
     '.mw{position:absolute;left:265px;top:0;width:910px;transition:transform .4s cubic-bezier(.25,.1,.25,1);will-change:transform}' +
     '.md{position:relative;margin:30px 0 60px;background:#181818;border-radius:6px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.75);transform:scale(.9);opacity:0;transition:transform .25s ease-out,opacity .25s ease-out}.ov.on .md{transform:none;opacity:1}' +
@@ -570,14 +582,17 @@
     });
   }
   function renderSearch(token, keepFocus) {
-    var query = view.query = (keepFocus && keepFocus.query) || '';
-    return searchResults(query).then(function (items) {
+    view.query = (keepFocus && keepFocus.query) || '';
+    var keys = '<div class="kr"><div class="k mic" data-k="mic">' + icons.mic + '</div><div class="k" data-k=" ">' + icons.space + '</div><div class="k" data-k="del">' + icons.del + '</div></div><div class="kg">';
+    KEYS.forEach(function (key) { keys += '<div class="k" data-k="' + key + '">' + key + '</div>'; });
+    el.page.innerHTML = '<div class="kb">' + keys + '</div><div class="sug"></div></div><div class="sr"><div class="sq"></div><div class="gw"><div class="grid"></div></div></div>';
+    view.blocks.push({type:'keys', el:el.page.querySelector('.kb'), nodes:el.page.querySelectorAll('.k'), index:3, col:0});
+    view.blocks.push({type:'sugg', el:el.page.querySelector('.sug'), items:[], nodes:[], index:0});
+    view.blocks.push({type:'grid', el:el.page.querySelector('.sr .grid'), items:[], cards:[], index:0, columns:4, scroll:true});
+    return searchResults(view.query).then(function (items) {
       if (token !== renderToken) return;
-      el.page.innerHTML = '<div class="ph" style="padding-top:118px"><h1>Szukaj</h1></div><div class="sbox' + (query ? ' has' : '') + '">' + icons.search + '<span></span></div><div class="ph"><h1 style="font-size:26px">' + (query ? 'Wyniki wyszukiwania' : 'Popularne wyszukiwania') + '</h1></div><div class="grid"></div>';
-      el.page.querySelector('.sbox span').textContent = query || 'Tytuły, ludzie, gatunki';
-      view.blocks.push({type:'box', el:el.page.querySelector('.sbox'), index:0});
       fillSearch(items);
-      finishRender(keepFocus || {block:0, index:0});
+      finishRender(keepFocus && keepFocus.block != null ? keepFocus : {block:0, index:3});
     });
   }
   function searchResults(query) {
@@ -587,12 +602,34 @@
     });
   }
   function fillSearch(items) {
-    var grid = el.page.querySelector('.grid'), html = '', tops = topIds();
+    var html = '', tops = topIds(), grid = view.blocks[2], sugg = view.blocks[1];
+    showQuery();
     items.forEach(function (item, i) { html += cardHTML(item, 'grid', i, tops); });
-    grid.innerHTML = items.length ? html : '<p class="empty" style="padding:0">Brak wyników. Spróbuj innego tytułu.</p>';
-    view.blocks = view.blocks.filter(function (b) { return b.type !== 'grid'; });
-    if (items.length) view.blocks.push({type:'grid', el:grid, items:items, index:0, cards:grid.querySelectorAll('.cd')});
+    grid.el.innerHTML = items.length ? html : '<p class="empty" style="padding:0">Brak wyników. Spróbuj innego tytułu.</p>';
+    grid.el.style.transform = '';
+    grid.items = items;grid.cards = grid.el.querySelectorAll('.cd');grid.index = 0;
+    sugg.items = view.query ? items.map(function (item) { return item.title; }).filter(function (title, i, all) { return all.indexOf(title) === i; }).slice(0, 4) : [];
+    sugg.el.innerHTML = sugg.items.map(function (title) { return '<div>' + esc(title) + '</div>'; }).join('');
+    sugg.nodes = sugg.el.querySelectorAll('div');sugg.index = 0;
+    if (focus.block > 0 && !view.blocks[focus.block].items.length) focus.block = 0;
     hydrate();
+    if (ready) applyFocus();
+  }
+  function showQuery() {
+    var heading = el.page.querySelector('.sq');
+    heading.textContent = view.query || 'Popularne wyszukiwania';
+    heading.classList.toggle('ph2', !view.query);
+  }
+  function setQuery(query) {
+    view.query = query;
+    showQuery();
+    clearTimeout(api.searchTimer);
+    api.searchTimer = setTimeout(function () {
+      var token = renderToken;
+      searchResults(query).then(function (items) {
+        if (token === renderToken && view.query === query) fillSearch(items);
+      });
+    }, 250);
   }
   function renderLanguage(token, keepFocus) {
     var lang = view.lang = keepFocus && keepFocus.lang != null ? keepFocus.lang : 0;
@@ -637,7 +674,7 @@
     var block = currentBlock();
     if (!block) return null;
     if (block.type === 'hero') return block.el.querySelectorAll('.tb')[block.index];
-    if (block.type === 'box') return block.el;
+    if (block.type === 'keys' || block.type === 'sugg') return block.nodes[block.index];
     if (block.type === 'filter') return block.el.querySelector('.dd');
     return block.cards[block.index];
   }
@@ -667,6 +704,9 @@
       y = Math.max(0, block.el.offsetTop + block.el.parentNode.offsetTop - ROW_Y);
       var card = block.cards[block.index];
       block.el.querySelector('.trk').style.transform = 'translateX(' + (-(card ? card.offsetLeft - block.cards[0].offsetLeft : 0)) + 'px)';
+    } else if (block && block.type === 'grid' && block.scroll) {
+      var sc = block.cards[block.index];
+      block.el.style.transform = 'translateY(' + (-Math.max(0, (sc ? sc.offsetTop - 12 : 0) - 177)) + 'px)';
     } else if (block && block.type === 'grid') {
       var c = block.cards[block.index];
       y = Math.max(0, (c ? c.offsetTop : block.el.offsetTop) - GRID_Y);
@@ -764,7 +804,15 @@
       applyFocus();
       return 'ok';
     }
-    if (block.type === 'box' || block.type === 'filter') {
+    if (block.type === 'keys') return moveKeys(block, direction);
+    if (block.type === 'sugg') {
+      if (direction === 'right') return toResults();
+      if (direction === 'up') { if (block.index > 0) block.index--; else focus.block = 0; }
+      else if (direction === 'down' && block.index + 1 < block.items.length) block.index++;
+      applyFocus();
+      return 'ok';
+    }
+    if (block.type === 'filter') {
       if (direction === 'up') return toNav();
       if (direction === 'down' && focus.block + 1 < view.blocks.length) { focus.block++; applyFocus(); }
       return 'ok';
@@ -785,12 +833,16 @@
       return 'ok';
     }
     if (block.type === 'grid') {
-      var columns = COLUMNS, i = block.index, n = block.items.length;
-      if (direction === 'left') { if (i % columns === 0) return 'edge'; block.index--; }
+      var columns = block.columns || COLUMNS, i = block.index, n = block.items.length;
+      if (direction === 'left') {
+        if (i % columns) block.index--;
+        else if (block.scroll) focus.block = 0;
+        else return 'edge';
+      }
       else if (direction === 'right') { if (i % columns === columns - 1 || i + 1 >= n) return 'edge'; block.index++; }
       else if (direction === 'up') {
         if (i - columns >= 0) block.index -= columns;
-        else if (focus.block > 0) focus.block--;
+        else if (focus.block > 0 && !block.scroll) focus.block--;
         else return toNav();
       } else {
         if (i + columns < n) block.index += columns;
@@ -801,6 +853,30 @@
       return 'ok';
     }
     return 'edge';
+  }
+  function moveKeys(block, direction) {
+    var i = block.index, top = i < 3, col = top ? block.col : (i - 3) % 6;
+    if (direction === 'left' || direction === 'right') {
+      var step = direction === 'left' ? -1 : 1;
+      if (top ? i + step > 2 : col + step > 5) return toResults();
+      if (top ? i + step < 0 : col + step < 0) return 'ok';
+      block.index = i + step;
+      block.col = top ? block.index * 2 : col + step;
+    } else if (direction === 'up') {
+      if (top) return toNav();
+      block.index = i < 9 ? Math.floor(col / 2) : i - 6;
+    } else if (top) block.index = 3 + (Math.floor(block.col / 2) === i ? block.col : i * 2);
+    else if (i + 6 < block.nodes.length) block.index = i + 6;
+    else if (view.blocks[1].items.length) { focus.block = 1; view.blocks[1].index = 0; }
+    applyFocus();
+    return 'ok';
+  }
+  function toResults() {
+    var grid = view.blocks[2];
+    if (!grid.items.length) return 'ok';
+    focus.block = 2;grid.index -= grid.index % grid.columns;
+    applyFocus();
+    return 'ok';
   }
   function toNav() {
     focus.block = -1;
@@ -826,7 +902,13 @@
       return true;
     }
     if (block.type === 'filter') { openList(LANGUAGES.map(function (l) { return l.label; }), view.lang, block.el.querySelector('.dd'), function (index) { openSection('lang', {block:0, lang:index}); }); return true; }
-    if (block.type === 'box') return true;
+    if (block.type === 'keys') {
+      var key = block.nodes[block.index].getAttribute('data-k');
+      if (key === 'mic') return 'voice';
+      setQuery(key === 'del' ? view.query.slice(0, -1) : (view.query + key).replace(/^ +/, ''));
+      return true;
+    }
+    if (block.type === 'sugg') { setQuery(block.items[block.index]); return true; }
     var item = block.items[block.index];
     if (!item) return false;
     if (block.kind === 'cw' && item.entry) play(item, item.entry.season, item.entry.episode);
@@ -1149,7 +1231,27 @@
     if (host) host.hidden = true;
     if (original.resume) original.resume.call(nav);
   }
-  function sync() { if (shellRoute()) activate(); else deactivate(); }
+  function pageHeader() {
+    if (location.pathname !== '/settings' || !document.body) { if (el.pageHeader) el.pageHeader.remove(); return; }
+    if (!el.pageHeader) {
+      var header = document.createElement('div');
+      header.id = 'rive-page-hdr';
+      var html = logo + '<nav>';
+      NAV.forEach(function (item) { html += '<a href="/" data-s="' + item.id + '">' + esc(item.label) + '</a>'; });
+      html += '</nav><div class="tl"><a href="/search" data-s="search" class="ic" aria-label="Szukaj">' + icons.search + '</a><span class="av on"><b></b></span></div>';
+      header.innerHTML = html;
+      header.addEventListener('click', function (event) {
+        var link = event.target.closest('a[data-s]');
+        if (!link) return;
+        event.preventDefault();
+        try { sessionStorage.setItem('RiveTVShellReturn', JSON.stringify({time:Date.now(), section:link.getAttribute('data-s'), block:0, index:0})); } catch (_) {}
+        go(link.getAttribute('data-s') === 'search' ? '/search' : '/');
+      });
+      el.pageHeader = header;
+    }
+    if (!el.pageHeader.isConnected) document.body.appendChild(el.pageHeader);
+  }
+  function sync() { if (shellRoute()) activate(); else deactivate(); pageHeader(); }
   ['pushState', 'replaceState'].forEach(function (name) {
     var fn = history[name];
     history[name] = function () { var result = fn.apply(this, arguments); setTimeout(sync, 0); return result; };
@@ -1164,13 +1266,7 @@
       if (modal) return moveModal(direction);
       return moveBrowse(direction);
     },
-    target:function () {
-      if (!modal && !list && view && currentBlock() && currentBlock().type === 'box') {
-        var r = currentBlock().el.getBoundingClientRect();
-        return {search:true, text:view.query || '', left:r.left / innerWidth, top:r.top / innerHeight, width:r.width / innerWidth, height:r.height / innerHeight};
-      }
-      return {shell:true};
-    },
+    target:function () { return {shell:true}; },
     activate:function () {
       if (!ready) return true;
       if (list) { var chosen = list.index, choose = list.choose; closeList(); choose(chosen); return true; }
@@ -1188,19 +1284,7 @@
     pageState:function () { return ready ? 'ready' : 'loading'; },
     search:function (query) {
       if (!view || view.section !== 'search') return false;
-      view.query = query;
-      var box = el.page.querySelector('.sbox');
-      if (box) { box.classList.toggle('has', !!query); box.querySelector('span').textContent = query || 'Tytuły, ludzie, gatunki'; }
-      clearTimeout(api.searchTimer);
-      api.searchTimer = setTimeout(function () {
-        var token = renderToken;
-        searchResults(query).then(function (items) {
-          if (token !== renderToken || view.query !== query) return;
-          var heading = el.page.querySelectorAll('.ph h1')[1];
-          if (heading) heading.textContent = query ? 'Wyniki wyszukiwania' : 'Popularne wyszukiwania';
-          fillSearch(items);
-        });
-      }, 250);
+      setQuery(query);
       return true;
     },
     finishEditing:function () { if (view && view.section === 'search') { focus.block = 0; applyFocus(); } return true; },

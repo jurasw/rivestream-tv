@@ -22,6 +22,12 @@ Regresje: `scripts/test-playback.sh` — 62 kontrole preferencji, odliczania, pa
 
 Lokalna aplikacja APK do obsługi **https://www.rivestream.app/** pilotem telewizora. Ma menu TV, zaznaczanie kafelków strzałkami, wyszukiwanie klawiaturą ekranową z jej systemowym dyktowaniem, listy wyboru dostosowane do pilota, pełny ekran odtwarzacza oraz przełączany kursor do osadzonych odtwarzaczy. Podczas oglądania menu boczne chowa się automatycznie. Historia, ustawienia strony i sesja są zapisywane w prywatnym WebView aplikacji.
 
+## Wersja 1.8.0 — bez menu bocznego, wyszukiwanie jak w Netflix
+
+Natywne menu boczne zostało usunięte. Ekran ładowania od startu pokazuje logo Rive ze spinnerem na całym ekranie. Ustawienia (ludek w prawym górnym rogu) mają ten sam górny pasek co strona główna; zakładki prowadzą z powrotem do przeglądania. Menu pilota nadal otwiera klawisz Menu.
+
+Wyszukiwanie ma klawiaturę ekranową po lewej (mikrofon, spacja, kasowanie, a–z, 0–9), podpowiedzi tytułów pod nią i wyniki po prawej. Mikrofon otwiera systemowe rozpoznawanie mowy (`RecognizerIntent`, preferowany Google TV `com.google.android.katniss`), a rozpoznany tekst trafia do `RiveTV.search`. Przyciski odtwarzacza nie mają już szarego koła pod fokusem.
+
 ## Wersja 1.5.4 — płynność i wygląd jak w aplikacjach TV
 
 Zmiany robocze odtwarzacza TV: osobny czas wznowienia dla filmu i każdego odcinka, także w zagnieżdżonych odtwarzaczach Embed. Ulubione, historia, postęp i ustawienia mają dodatkową kopię w prywatnych preferencjach Androida; aktualizacja tego samego pakietu z zachowaniem podpisu zachowuje dane. Odtwarzacz startuje automatycznie przez znane kontrolki dostawców i nie wznawia sam celowej pauzy. Interfejs początkowo jest schowany: Wstecz lub Dół odsłania kontrolki, kolejne Wstecz wraca; OK przełącza pauzę, Lewo/Prawo przewija o 10 s. Pomijanie intro zostało usunięte. „Następny odcinek” pojawia się jako sam przycisk z automatycznym zaznaczeniem dla pilota; odliczanie auto next jest na przycisku. OK na schowanym lub zaznaczonym odtwarzaczu przełącza pauzę i odtwarzanie, także na pełnym ekranie; przy widocznych kontrolkach OK nadal wybiera zaznaczony przycisk. Dostępność wideo nadal zależy od serwera i WebView. Kopia nie obejmuje tokenów zewnętrznych kont. Odinstalowanie lub wyczyszczenie danych aplikacji usuwa zapis.
