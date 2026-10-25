@@ -13,6 +13,8 @@ allowed = {
     "/tests/playback-provider.html": ("tests/playback-provider.html", "text/html"),
     "/tests/playback.html": ("tests/playback.html", "text/html"),
     "/tests/ads.html": ("tests/ads.html", "text/html"),
+    "/tests/servers.html": ("tests/servers.html", "text/html"),
+    "/app/src/main/assets/tv-servers.js": ("app/src/main/assets/tv-servers.js", "text/javascript"),
     "/tests/ads-frame.html": ("tests/ads-frame.html", "text/html"),
     "/tests/ads-captcha.html": ("tests/ads-captcha.html", "text/html"),
     "/app/src/main/assets/tv-ads.js": ("app/src/main/assets/tv-ads.js", "text/javascript"),

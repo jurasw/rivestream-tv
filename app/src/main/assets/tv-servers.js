@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   if (window.RiveTVServers || window !== window.top || !window.RiveTV) return;
-  var WAIT = 9000, NO_SOURCE = 12000, MIN_DURATION = 90;
+  var WAIT = 9000, NO_SOURCE = 12000, MIN_DURATION = 90, AUDIO_WAIT = 2500;
   var IMG = 'https://image.tmdb.org/t/p/';
   var css = ':host{all:initial;position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483646;display:block;contain:strict}' +
     ':host([hidden]){display:none}*{box-sizing:border-box}svg{display:block;width:100%;height:100%}p{margin:0}' +
@@ -137,7 +137,7 @@
   function start() {
     var params = new URLSearchParams(location.search);
     if (location.pathname !== '/watch' || !params.get('id')) { stop(); return; }
-    search = {route:location.pathname + location.search, phase:'waiting-source', began:Date.now(), labels:null, order:[], pos:0, tried:[], current:-1, switchedAt:0};
+    search = {route:location.pathname + location.search, phase:'waiting-source', began:Date.now(), labels:null, order:[], pos:0, tried:[], current:-1, switchedAt:0, workingAt:0, fallback:-1, final:false};
     button = 0;
     show();
     status('Szukam najlepszego serwera…');
@@ -156,9 +156,11 @@
   function next() {
     if (!search) return;
     if (search.current !== -1 && search.tried.indexOf(search.current) === -1) search.tried.push(search.current);
-    if (search.pos >= search.order.length) return fail();
-    var index = search.order[search.pos++];
-    search.phase = 'switching';search.current = index;
+    var index;
+    if (search.pos < search.order.length) index = search.order[search.pos++];
+    else if (search.fallback !== -1 && !search.final) { index = search.fallback;search.final = true; }
+    else return fail();
+    search.phase = 'switching';search.current = index;search.workingAt = 0;
     status('Sprawdzam ' + search.labels[index].replace(/\s*[✦*].*$/, '').replace(/\s*\(.*\)\s*$/, '') + '…');
     selectServer(index, function (ok) {
       if (!search || search.current !== index) return;
@@ -170,6 +172,26 @@
     var state = window.RiveTVPlayback && RiveTVPlayback.state && RiveTVPlayback.state();
     if (!state || state.received < search.switchedAt + 300 || !(state.duration > MIN_DURATION)) return false;
     return state.time > .5 || !state.buffering;
+  }
+  function language() {
+    return window.RiveTVPlayback && RiveTVPlayback.audioLanguage ? RiveTVPlayback.audioLanguage() : '';
+  }
+  function audio() {
+    var state = window.RiveTVPlayer && RiveTVPlayer.status();
+    return state && state.audio || 'unknown';
+  }
+  function accept() {
+    if (!language() || search.final) return true;
+    if (!search.workingAt) search.workingAt = Date.now();
+    var found = audio();
+    if (found === 'match') return true;
+    if (found === 'other') {
+      if (search.fallback === -1) search.fallback = search.current;
+      status('Szukam serwera z wybranym językiem audio…');
+      next();
+      return false;
+    }
+    return Date.now() - search.workingAt > AUDIO_WAIT;
   }
   function blocked() {
     if (!window.RiveTVAds || !RiveTVAds.captcha) return false;
@@ -213,7 +235,7 @@
       return;
     }
     if (search.phase !== 'probing') return;
-    if (working()) return succeed();
+    if (working()) { if (accept()) succeed(); return; }
     if (blocked() || Date.now() - search.switchedAt > WAIT) next();
     else status(el.msg.textContent);
   }

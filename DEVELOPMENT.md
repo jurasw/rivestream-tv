@@ -22,6 +22,14 @@ Regresje: `scripts/test-playback.sh` — 62 kontrole preferencji, odliczania, pa
 
 Lokalna aplikacja APK do obsługi **https://www.rivestream.app/** pilotem telewizora. Ma menu TV, zaznaczanie kafelków strzałkami, wyszukiwanie klawiaturą ekranową z jej systemowym dyktowaniem, listy wyboru dostosowane do pilota, pełny ekran odtwarzacza oraz przełączany kursor do osadzonych odtwarzaczy. Podczas oglądania menu boczne chowa się automatycznie. Historia, ustawienia strony i sesja są zapisywane w prywatnym WebView aplikacji.
 
+## Wersja 1.9.0 — napisy z Wyzie i preferowany język audio
+
+Napisy strony pochodziły z `subs.1shows.app`, którego domena już nie istnieje. Lista napisów pochodzi teraz z Wyzie Subs (`https://sub.wyzie.io/search`), które wymaga darmowego klucza (store.wyzie.io/redeem). Klucz wpisuje się w Ustawieniach („Klucz Wyzie do napisów”). Jest zapisany w `RiveTVPlaybackSettings` (prywatna kopia Androida) i używany tylko w głównej ramce; nie trafia do ramek dostawców. Panel „Audio / Napisy” pokazuje napisy serwera, a pod nimi języki z Wyzie (polski i angielski pierwsze, bez powtórzeń, tylko adresy HTTPS). Wybrany plik SRT/VTT pobiera i parsuje główna ramka (UTF-8, a w razie błędu cp1250), a gotowe napisy trafiają do ramki z wideo. Wybór języka jest zapamiętywany i włączany automatycznie w kolejnych odcinkach. Napisy wyglądają jak w Netflixie na TV: biały półgruby tekst bez tła z miękkim cieniem.
+
+„Preferowany język audio” (japoński, angielski, polski) wybiera pasującą ścieżkę, gdy strumień ma kilka (natywne `audioTracks`, hls.js, JW Player, Video.js). Wyszukiwanie serwera pomija serwer, którego ścieżki są oznaczone tylko innym językiem; gdy żaden nie pasuje, wraca do pierwszego działającego. Serwer bez oznaczenia języka jest akceptowany po 2,5 s, bo nie da się go rozpoznać. Serwery strony nie podają języka w nazwie, więc skuteczność zależy od tego, czy dostawca oznacza ścieżki.
+
+Testy: `scripts/test-playback.sh` (71 kontroli odtwarzacza, w tym napisy Wyzie z podstawionym API, 23 reklam i 4 wyszukiwania serwera po języku audio w `tests/servers.html`).
+
 ## Wersja 1.8.0 — bez menu bocznego, wyszukiwanie jak w Netflix
 
 Natywne menu boczne zostało usunięte. Ekran ładowania od startu pokazuje logo Rive ze spinnerem na całym ekranie. Ustawienia (ludek w prawym górnym rogu) mają ten sam górny pasek co strona główna; zakładki prowadzą z powrotem do przeglądania. Menu pilota nadal otwiera klawisz Menu.
