@@ -64,12 +64,14 @@
     '.bar{position:relative;flex:none;width:132px;height:2px;background:#808080;overflow:hidden}.bar i{position:absolute;inset:0;background:#f50723;transform-origin:0 0}' +
     '.ep .r2{display:none;gap:32px;margin-top:16px}.ep.big .r2{display:flex}.ep .syn{width:420px;font-weight:400}.ep .still svg{display:none}' +
     '.ep.f{background:#3a3a3a}.ep.cur.f,.ep.big.f{background:#333}' +
-    '.tracks{width:584px;max-height:568px;border-radius:4px;display:flex;gap:4px;overflow:hidden}.col{position:relative;width:312px}.col+.col{width:268px}' +
-    '.col header{height:52px;padding:12px 10px 10px 40px;font-size:22px;line-height:22px;font-weight:500}.col .view{max-height:516px;padding-bottom:20px}' +
-    '.col .view::after{content:"";position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(180deg,rgba(38,38,38,0),#262626);pointer-events:none}' +
-    '.note{padding:10px 20px 0 40px;font-size:16px;line-height:22px;color:#808080;white-space:normal}' +
-    '.it{position:relative;height:56px;padding:0 20px 0 40px;font-size:20px;line-height:56px;color:#b3b3b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.it.f{color:#fff;background:rgba(255,255,255,.14)}.it.sel{color:#fff}.it svg{position:absolute;left:15px;top:22px;width:18px;height:13px;display:none}.it.sel svg{display:block}' +
+    '.panel.tracks{position:fixed;left:0;right:0;top:0;bottom:0;width:auto;max-height:none;border-radius:0;display:flex;justify-content:center;gap:96px;padding:112px 0 0;z-index:5;background:radial-gradient(ellipse at 50% 30%,rgba(24,24,24,.97) 0%,rgba(0,0,0,.985) 70%);transform:scale(1.02)}' +
+    '.panel.tracks.open{transform:none}.col{position:relative;width:440px}' +
+    '.col header{height:auto;padding:0 0 26px 48px;font-size:34px;line-height:40px;font-weight:700;letter-spacing:-.3px;color:#fff}' +
+    '.col .view{max-height:calc(var(--h,810px) - 230px);padding:6px 0 40px;-webkit-mask-image:linear-gradient(180deg,#000 82%,transparent);mask-image:linear-gradient(180deg,#000 82%,transparent)}' +
+    '.note{padding:18px 16px 0 48px;font-size:19px;line-height:27px;color:#8c8c8c;white-space:normal}' +
+    '.it{position:relative;height:60px;margin:0 0 4px;padding:0 24px 0 48px;border-radius:6px;font-size:26px;line-height:60px;color:#a3a3a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background-color .12s,color .12s,transform .15s}' +
+    '.it.sel{color:#fff;font-weight:500}.it.f{background:#fff;color:#000;font-weight:600;transform:scale(1.03)}' +
+    '.it svg{position:absolute;left:16px;top:22px;width:20px;height:15px;display:none}.it svg path{stroke-width:2.4}.it.sel svg{display:block}' +
     '.speed{width:840px;height:220px}.speed .h{position:absolute;left:30px;top:24px;line-height:45px}' +
     '.rail{position:absolute;left:48px;top:92px;width:736px;height:1px;background:#979797}' +
     '.stop{position:absolute;top:0;width:0;height:0}.stop i{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:#dcdcdc}' +
@@ -647,7 +649,7 @@
       });
       var hint = col ? view && view.subtitleNote : source.items.length < 2 ? 'Ten serwer ma jedną ścieżkę audio. Inny język może być na innym serwerze.' : '';
       if (hint) {var note = document.createElement('div');note.className = 'note';note.textContent = hint;box.appendChild(note);}
-      scrollList(box,col === panelCol ? box.children[panelIndex] : null,496);
+      scrollList(box,col === panelCol ? box.children[panelIndex] : null,box.parentNode.clientHeight - 46 || 496);
     });
   }
   function renderSpeed() {
@@ -661,7 +663,11 @@
     el.vol.querySelector('.vf').style.transform = 'scaleY(' + level + ')';
     el.vol.querySelector('.vk').style.transform = 'translateY(' + (-98 * level) + 'px)';
   }
-  function label(name,language,index) {return text(name,60) || text(language,20) || 'Ścieżka ' + (index + 1);}
+  function label(name,language,index) {
+    var plain = text(name,60), code = text(language,8).toLowerCase().split(/[-_]/)[0];
+    if (code && (!plain || /^[a-z]+$/i.test(plain))) {var local = languageName(code,'');if (local) return local;}
+    return plain || text(language,20) || 'Ścieżka ' + (index + 1);
+  }
   function jw() {
     try {
       var player = typeof window.jwplayer === 'function' && window.jwplayer();
