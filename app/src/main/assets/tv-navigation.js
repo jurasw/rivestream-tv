@@ -312,7 +312,7 @@
     if (!selected || !available(selected)) first();
     if (!selected) return null;
     if (selected.tagName === 'SELECT') {
-      return {select:true, title:selected.getAttribute('aria-label') || selected.name || 'Wybierz opcję', multiple:selected.multiple,
+      return {select:true, title:selected.getAttribute('aria-label') || selected.name || 'Choose an option', multiple:selected.multiple,
         options:Array.prototype.map.call(selected.options, function (option, index) {
           return {index:index,label:option.text,value:option.value,selected:option.selected,disabled:option.disabled || (option.parentElement.tagName === 'OPTGROUP' && option.parentElement.disabled)};
         })};

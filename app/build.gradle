@@ -9,8 +9,8 @@ android {
         applicationId 'app.rivestream.tv'
         minSdk 28
         targetSdk 35
-        versionCode = (project.findProperty("riveVersionCode") ?: "10904").toInteger()
-        versionName = (project.findProperty("riveVersionName") ?: "1.9.4").toString()
+        versionCode = (project.findProperty("riveVersionCode") ?: "10905").toInteger()
+        versionName = (project.findProperty("riveVersionName") ?: "1.9.5").toString()
         testInstrumentationRunner 'app.rivestream.tv.InputRegressionTest'
     }
     buildTypes {

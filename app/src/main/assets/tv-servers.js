@@ -39,7 +39,7 @@
     shadow.innerHTML = '<style>' + css + '</style><div class="stage"><div class="bg"></div><div class="sh"></div><div class="back">' + back + '</div><div class="mid">' +
       '<div class="ring">' + arc + '<div class="mk">' + mark + '</div></div><div class="head"></div><p class="ep"></p>' +
       '<div class="st"><span class="msg"></span><div class="dots"></div></div>' +
-      '<div class="fail"><p>Żaden serwer nie odtworzył tego tytułu. Spróbuj ponownie albo wybierz serwer ręcznie.</p><div class="btns"><div class="tb">Spróbuj ponownie</div><div class="tb">Wybierz serwer</div></div></div></div></div>';
+      '<div class="fail"><p>No server played this title. Try again or choose a server yourself.</p><div class="btns"><div class="tb">Try again</div><div class="tb">Choose server</div></div></div></div></div>';
     ['stage', 'bg', 'head', 'ep', 'msg', 'dots', 'mid'].forEach(function (name) { el[name] = shadow.querySelector('.' + name); });
     el.buttons = shadow.querySelectorAll('.tb');
     window.addEventListener('resize', layout);
@@ -79,7 +79,7 @@
       var p = document.createElement('p');p.className = 'title';p.textContent = title;
       el.head.appendChild(p);
     }
-    el.ep.textContent = params.get('type') === 'tv' ? 'Sezon ' + (params.get('season') || 1) + ' · Odcinek ' + (params.get('episode') || 1) : '';
+    el.ep.textContent = params.get('type') === 'tv' ? 'Season ' + (params.get('season') || 1) + ' · Episode ' + (params.get('episode') || 1) : '';
   }
   function status(text) {
     if (!el.msg) return;
@@ -140,7 +140,7 @@
     search = {route:location.pathname + location.search, phase:'waiting-source', began:Date.now(), labels:null, order:[], pos:0, tried:[], current:-1, switchedAt:0, workingAt:0, fallback:-1, final:false};
     button = 0;
     show();
-    status('Szukam najlepszego serwera…');
+    status('Finding the best server…');
   }
   function find() {
     if (!search || !search.labels || location.pathname !== '/watch') return false;
@@ -150,7 +150,7 @@
       fallback:current, final:false, strict:true};
     button = 0;
     show();
-    status('Szukam serwera z wybranym językiem audio…');
+    status('Finding a server with the chosen audio language…');
     next();
     return true;
   }
@@ -173,7 +173,7 @@
     else if (search.fallback !== -1 && !search.final) { index = search.fallback;search.final = true; }
     else return fail();
     search.phase = 'switching';search.current = index;search.workingAt = 0;
-    status('Sprawdzam ' + search.labels[index].replace(/\s*[✦*].*$/, '').replace(/\s*\(.*\)\s*$/, '') + '…');
+    status('Checking ' + search.labels[index].replace(/\s*[✦*].*$/, '').replace(/\s*\(.*\)\s*$/, '') + '…');
     selectServer(index, function (ok) {
       if (!search || search.current !== index) return;
       if (!ok) return next();
@@ -200,7 +200,7 @@
     var waited = Date.now() - search.workingAt > AUDIO_WAIT;
     if (found === 'other' || (search.strict && waited)) {
       if (search.fallback === -1) search.fallback = search.current;
-      status('Szukam serwera z wybranym językiem audio…');
+      status('Finding a server with the chosen audio language…');
       next();
       return false;
     }
@@ -219,9 +219,9 @@
     var state = RiveTVPlayback.state();
     if (state && state.paused) RiveTVPlayback.command('play');
     if (search.strict && search.final) {
-      status('Żaden serwer nie ma ścieżki w wybranym języku. Wracam do poprzedniego.');
+      status('No server has audio in that language. Going back to the previous one.');
       setTimeout(function () { hide(true); }, 3000);
-    } else { status('Gotowe'); hide(true); }
+    } else { status('Done'); hide(true); }
   }
   function fail() {
     search.phase = 'failed';search.current = -1;

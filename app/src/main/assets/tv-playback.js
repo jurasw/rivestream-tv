@@ -7,6 +7,7 @@
   var nextPanel, nextSettings, nextState = null, nextCountdown = 0, nextCancelled = false, advancing = false;
   var nextPreferences = {autoNext:false,outroSeconds:90,subtitles:null,subtitleKey:'',audioLanguage:''}, nextView = {eligible:false};
   var preferencesLoaded = false, AUDIO_LANGUAGES = ['','ja','en','pl'];
+  var SUBTITLE_NAMES = {'wyłączone':'off','polski':'polish','angielski':'english','japoński':'japanese','czeski':'czech','niemiecki':'german','francuski':'french','hiszpański':'spanish','włoski':'italian','rosyjski':'russian','ukraiński':'ukrainian','portugalski':'portuguese','koreański':'korean','chiński':'chinese','turecki':'turkish','arabski':'arabic','niderlandzki':'dutch','szwedzki':'swedish'};
   function loadPreferences() {
     if (preferencesLoaded) return;
     preferencesLoaded = true;
@@ -15,7 +16,7 @@
       var storedPreferences = JSON.parse(localStorage.getItem('RiveTVPlaybackSettings') || '{}');
       nextPreferences.autoNext = storedPreferences.autoNext === true;
       if ([0,30,60,90,120,180].indexOf(storedPreferences.outroSeconds) !== -1) nextPreferences.outroSeconds = storedPreferences.outroSeconds;
-      if (typeof storedPreferences.subtitles === 'string' && storedPreferences.subtitles.length <= 80) nextPreferences.subtitles = storedPreferences.subtitles;
+      if (typeof storedPreferences.subtitles === 'string' && storedPreferences.subtitles.length <= 80) nextPreferences.subtitles = storedPreferences.subtitles.replace(/^[^ ]+/,function (name) {return SUBTITLE_NAMES[name] || name;});
       if (typeof storedPreferences.subtitleKey === 'string' && /^[\w-]{0,100}$/.test(storedPreferences.subtitleKey)) nextPreferences.subtitleKey = storedPreferences.subtitleKey;
       if (AUDIO_LANGUAGES.indexOf(storedPreferences.audioLanguage) !== -1) nextPreferences.audioLanguage = storedPreferences.audioLanguage;
     } catch (_) {}
@@ -68,12 +69,12 @@
     var group = mode && mode.closest('[class*="group__"]');
     if (!group) return;
     nextSettings = document.createElement('div');nextSettings.id = 'rive-next-settings';
-    nextSettings.innerHTML = '<label for="rive-auto-next">Auto next — następny odcinek</label><button id="rive-auto-next" type="button" role="switch"></button><label for="rive-outro-seconds">Pokaż przycisk przed końcem odcinka</label><select id="rive-outro-seconds"><option value="0">Po zakończeniu</option><option value="30">30 sekund</option><option value="60">1 minuta</option><option value="90">1,5 minuty</option><option value="120">2 minuty</option><option value="180">3 minuty</option></select><p>Przycisk „Następny odcinek” pozwala przejść od razu. Auto next przełącza po 15 sekundach; odliczanie można anulować. Czas outro jest przybliżony.</p>' +
-      '<label for="rive-audio-language">Preferowany język audio</label><select id="rive-audio-language"><option value="">Bez preferencji</option><option value="ja">Japoński</option><option value="en">Angielski</option><option value="pl">Polski</option></select>' +
-      '<label for="rive-subtitle-key">Klucz Wyzie do napisów</label><input id="rive-subtitle-key" type="text" autocomplete="off" spellcheck="false" placeholder="Wpisz klucz">' +
-      '<p>Język audio: wyszukiwanie serwera wybiera ścieżkę w tym języku, gdy serwer ją oznacza. Klucz Wyzie (darmowy, store.wyzie.io/redeem) włącza listę napisów w odtwarzaczu. Zostaje tylko na tym urządzeniu.</p>';
+    nextSettings.innerHTML = '<label for="rive-auto-next">Auto next — next episode</label><button id="rive-auto-next" type="button" role="switch"></button><label for="rive-outro-seconds">Show the button before the episode ends</label><select id="rive-outro-seconds"><option value="0">When it ends</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="90">1.5 minutes</option><option value="120">2 minutes</option><option value="180">3 minutes</option></select><p>The “Next episode” button moves on right away. Auto next switches after 15 seconds; you can cancel the countdown. The outro time is approximate.</p>' +
+      '<label for="rive-audio-language">Preferred audio language</label><select id="rive-audio-language"><option value="">No preference</option><option value="ja">Japanese</option><option value="en">English</option><option value="pl">Polish</option></select>' +
+      '<label for="rive-subtitle-key">Wyzie subtitles key</label><input id="rive-subtitle-key" type="text" autocomplete="off" spellcheck="false" placeholder="Enter key">' +
+      '<p>Audio language: the server search picks a track in this language when the server labels it. A Wyzie key (free, store.wyzie.io/redeem) turns on the subtitles list in the player. It stays on this device only.</p>';
     var toggle = nextSettings.querySelector('button');
-    function label() {toggle.textContent = nextPreferences.autoNext ? 'Włączone' : 'Wyłączone';toggle.setAttribute('aria-checked',String(nextPreferences.autoNext));}
+    function label() {toggle.textContent = nextPreferences.autoNext ? 'On' : 'Off';toggle.setAttribute('aria-checked',String(nextPreferences.autoNext));}
     label();toggle.onclick = function () {nextPreferences.autoNext = !nextPreferences.autoNext;persistPreferences();label();};
     var select = nextSettings.querySelector('select');select.value = String(nextPreferences.outroSeconds);
     select.onchange = function () {nextPreferences.outroSeconds = Number(select.value);persistPreferences();};
@@ -93,7 +94,7 @@
     if (!eligible) {nextCountdown = 0;nextView = {eligible:false};if (nextPanel) nextPanel.hidden = true;return;}
     if (!nextPanel) {
       nextPanel = document.createElement('div');nextPanel.id = 'rive-next-episode';nextPanel.hidden = true;
-      nextPanel.innerHTML = '<button type="button">Następny odcinek</button><button type="button">Anuluj auto next</button>';
+      nextPanel.innerHTML = '<button type="button">Next episode</button><button type="button">Cancel auto next</button>';
       nextPanel.querySelectorAll('button')[0].onclick = advanceEpisode;
       nextPanel.querySelectorAll('button')[1].onclick = function () {nextCancelled = true;nextCountdown = 0;updateNext();};
       document.body.appendChild(nextPanel);
@@ -103,7 +104,7 @@
     var auto = nextPreferences.autoNext && !nextCancelled;
     // Buffering, pauses, a background app and stale provider reports freeze the countdown.
     if (auto && (!state.paused || state.ended) && !state.buffering && !document.hidden && Date.now() - state.received < 2500) nextCountdown++;
-    var label = auto ? 'Następny odcinek (za ' + Math.max(0,15-nextCountdown) + ' s)' : 'Następny odcinek';
+    var label = auto ? 'Next episode (in ' + Math.max(0,15-nextCountdown) + ' s)' : 'Next episode';
     var button = nextPanel.querySelector('button');if (button.textContent !== label) button.textContent = label;
     nextPanel.querySelectorAll('button')[1].hidden = !auto;
     nextView = {eligible:true,auto:auto,remaining:auto ? Math.max(0,15-nextCountdown) : null};

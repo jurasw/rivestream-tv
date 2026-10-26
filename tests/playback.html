@@ -39,7 +39,7 @@
   check('no prompt during episode',!panel()||panel().hidden);
   eval(await (await fetch('/app/src/main/assets/tv-navigation.js')).text());
   time=1081;step(2);check('prompt appears at configured outro time',panel()&&!panel().hidden);
-  check('prompt offers immediate next episode',panel().querySelector('button').textContent.startsWith('Następny odcinek'));
+  check('prompt offers immediate next episode',panel().querySelector('button').textContent.startsWith('Next episode'));
   check('next button automatically receives remote focus',document.querySelector('[data-rive-focus]')===panel().querySelector('button'));
   check('next button has no surrounding caption or background',!panel().querySelector('span')&&getComputedStyle(panel()).backgroundColor==='rgba(0, 0, 0, 0)'&&getComputedStyle(panel()).padding==='0px');
   check('highlighted next button takes priority over pause',RiveTV.target().playback!==true);
@@ -129,10 +129,10 @@
   check('Back on the compact bar reveals full controls',RiveTV.revealPlayback()===true);
   await wait(200);state=await probe(frame);check('full controls follow the compact bar',state.visible&&!state.compact);
   await press('down');await press('right',6);await press('ok');state=await probe(frame);
-  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Wyłączone,Angielski,Polski,Czeski');
+  check('audio and subtitles panel lists provider text tracks',state.panel==='tracks'&&state.items.join()==='Off,English,Polish,Czech');
   await press('down');await press('ok');frame.contentWindow.postMessage({fixture:'cue'},'*');await wait(200);state=await probe(frame);
   check('selected subtitle track is rendered by the overlay',state.modes.join()==='hidden,disabled'&&state.subtitle==='Hello world');
-  check('subtitle choice is remembered for next episodes',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='angielski');
+  check('subtitle choice is remembered for next episodes',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='english');
   check('Back closes the open panel first',RiveTV.revealPlayback()===true);await wait(200);
   state=await probe(frame);check('closing a panel returns focus to its button',!state.panel&&state.focus==='tracks');
   await press('right');await press('ok');await press('right');await press('ok');state=await probe(frame);
@@ -157,10 +157,10 @@
   check('movies have no episode buttons',state.rows.join()==='play,rewind,forward,volume,tracks,speed');
   check('subtitle search uses the TMDB id and stored key',subtitleQueries.indexOf('https://sub.wyzie.io/search?id=45745&key=fixture-key')!==-1);
   await press('right',4);await press('ok');state=await probe(frame);
-  check('subtitle panel adds deduplicated secure Wyzie languages',state.items.join()==='Wyłączone,Angielski,Polski,Czeski');
+  check('subtitle panel adds deduplicated secure Wyzie languages',state.items.join()==='Off,English,Polish,Czech');
   await press('down',3);await press('ok');frame.contentWindow.postMessage({fixture:'time',time:2},'*');await wait(1600);state=await probe(frame);
   check('Wyzie subtitles in cp1250 are decoded and rendered',state.subtitle==='Žluťoučký kůň');
-  check('Wyzie subtitle choice is remembered',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='czeski');
+  check('Wyzie subtitle choice is remembered',JSON.parse(localStorage.getItem('RiveTVPlaybackSettings')).subtitles==='czech');
   frame.contentWindow.postMessage({fixture:'time',time:10},'*');await wait(1600);state=await probe(frame);
   check('Wyzie subtitle clears after its cue ends',state.subtitle==='');
   check('preferred Japanese audio track is selected',state.audioTrack===1&&RiveTVPlayer.status().audio==='match');

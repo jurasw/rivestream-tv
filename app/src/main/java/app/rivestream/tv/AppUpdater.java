@@ -90,7 +90,7 @@ final class AppUpdater {
     private volatile boolean busy,destroyed,manual;
     private boolean foreground,installing,permissionPrompted;
     private Release ready;
-    private String status="Zainstalowana wersja "+BuildConfig.VERSION_NAME;
+    private String status="Installed version "+BuildConfig.VERSION_NAME;
     AppUpdater(Context context,Host host){this.context=context.getApplicationContext();this.host=host;prefs=this.context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
     private final Runnable periodicCheck=new Runnable(){@Override public void run(){if(!destroyed&&foreground){check(false);tryInstall(false);main.postDelayed(this,CHECK_INTERVAL);}}};
     void onResume(){foreground=true;main.removeCallbacks(periodicCheck);main.postDelayed(periodicCheck,5000);}
@@ -103,7 +103,7 @@ final class AppUpdater {
         if(busy || installing){if(explicit)host.updateMessage(status,true);return;}
         if(ready!=null && !explicit && System.currentTimeMillis()-prefs.getLong("last_check",0)<CHECK_INTERVAL){tryInstall(false);return;}
         if(!explicit && System.currentTimeMillis()-prefs.getLong("last_check",0)<CHECK_INTERVAL && !prefs.contains("ready_json"))return;
-        busy=true;status="Sprawdzam aktualizacje…";
+        busy=true;status="Checking for updates…";
         worker.execute(()->{
             try{
                 Release release=null;
@@ -111,22 +111,22 @@ final class AppUpdater {
                 if(cached!=null){try{Release candidate=new Release(new JSONObject(cached));if(candidate.code>installedCode() && readyFile().exists()){verifyApk(context,readyFile(),candidate);release=candidate;}else {readyFile().delete();prefs.edit().remove("ready_json").apply();}}catch(Exception ignored){readyFile().delete();prefs.edit().remove("ready_json").apply();}}
                 boolean recent=System.currentTimeMillis()-prefs.getLong("last_check",0)<CHECK_INTERVAL;
                 String json=release!=null && !explicit && recent ? cached : fetchManifest();
-                if(json==null){finishCheck("Nie ma jeszcze opublikowanej aktualizacji.");return;}
+                if(json==null){finishCheck("No update has been published yet.");return;}
                 Release candidate=new Release(new JSONObject(json));
                 if(candidate.code<=installedCode()){
                     readyFile().delete();prefs.edit().remove("ready_json").putLong("last_check",System.currentTimeMillis()).apply();
-                    post(()->ready=null);finishCheck("Masz aktualną wersję "+BuildConfig.VERSION_NAME+".");return;
+                    post(()->ready=null);finishCheck("You have the latest version "+BuildConfig.VERSION_NAME+".");return;
                 }
                 if(release==null || release.code!=candidate.code || !release.sha.equals(candidate.sha)){
-                    post(()->{status="Pobieram aktualizację "+candidate.version+"…";host.updateMessage(status,false);});
+                    post(()->{status="Downloading update "+candidate.version+"…";host.updateMessage(status,false);});
                     File part=new File(directory(),"download.apk");
                     try{download(candidate,part);verifyApk(context,part,candidate);Files.move(part.toPath(),readyFile().toPath(),StandardCopyOption.REPLACE_EXISTING);}catch(Exception failure){part.delete();throw failure;}
                 }else verifyApk(context,readyFile(),candidate);
                 prefs.edit().putString("ready_json",json).putLong("last_check",System.currentTimeMillis()).apply();release=candidate;
                 final Release update=release;
                 Log.i("RiveUpdate","Verified release "+update.version+" ("+update.code+")");
-                post(()->{busy=false;ready=update;status="Aktualizacja "+update.version+" gotowa.";if(manual){manual=false;showReady();}else {host.updateMessage(status,false);tryInstall(false);}});
-            }catch(Exception failure){Log.w("RiveUpdate","Update check/download failed",failure);finishCheck("Nie udało się sprawdzić lub pobrać aktualizacji. Spróbuj ponownie w menu.");}
+                post(()->{busy=false;ready=update;status="Update "+update.version+" gotowa.";if(manual){manual=false;showReady();}else {host.updateMessage(status,false);tryInstall(false);}});
+            }catch(Exception failure){Log.w("RiveUpdate","Update check/download failed",failure);finishCheck("Could not check or download the update. Try again from the menu.");}
         });
     }
     private void finishCheck(String message){post(()->{busy=false;status=message;boolean explicit=manual;manual=false;if(explicit)host.updateMessage(message,true);});}
@@ -154,13 +154,13 @@ final class AppUpdater {
             }
             prefs.edit().remove("session_id").remove("session_started").apply();
         }
-        installing=true;status="Instaluję aktualizację "+ready.version+"…";host.updateMessage(status,false);
+        installing=true;status="Installing update "+ready.version+"…";host.updateMessage(status,false);
         Release release=ready;
-        worker.execute(()->{try{verifyApk(context,readyFile(),release);commit(context,readyFile(),release);}catch(Exception failure){Log.w("RiveUpdate","Install failed",failure);post(()->{installing=false;defer();host.updateMessage("Nie udało się rozpocząć instalacji. Spróbuj ponownie w menu Aktualizacje.",true);});}});
+        worker.execute(()->{try{verifyApk(context,readyFile(),release);commit(context,readyFile(),release);}catch(Exception failure){Log.w("RiveUpdate","Install failed",failure);post(()->{installing=false;defer();host.updateMessage("Could not start the installation. Try again from Updates in the menu.",true);});}});
     }
     private void openPermissionSettings(){
         Intent intent=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+context.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try{context.startActivity(intent);}catch(android.content.ActivityNotFoundException missing){try{context.startActivity(new Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(android.content.ActivityNotFoundException ignored){host.updateMessage("Otwórz ustawienia TV i zezwól Rivestream TV na instalowanie aplikacji.",true);}}
+        try{context.startActivity(intent);}catch(android.content.ActivityNotFoundException missing){try{context.startActivity(new Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(android.content.ActivityNotFoundException ignored){host.updateMessage("Open the TV settings and allow Rivestream TV to install apps.",true);}}
     }
     private String fetchManifest() throws Exception {
         HttpURLConnection connection=open(LATEST_URL,"application/vnd.github+json");
