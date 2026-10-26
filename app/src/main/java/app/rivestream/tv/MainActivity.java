@@ -102,7 +102,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private boolean sourceError;
     private String captchaKind;
     private float captchaX=.5f,captchaY=.5f;
-    private long lastBlockNotice;
+    private long lastBlockNotice, watchBackAt, leftWatchAt;
     private final HashSet<String> captchaServers=new HashSet<>();
     private int heldArrow, arrowGeneration;
     private boolean arrowInFlight, arrowRepeated, centerPressedHere, keyboardRequested;
@@ -180,11 +180,11 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         wordmark.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->wordmark.getPaint().setShader(new android.graphics.LinearGradient(0,0,r-l,0,new int[]{0xfff69b65,0xffed5c91,0xffef009d},null,android.graphics.Shader.TileMode.CLAMP)));
         LinearLayout.LayoutParams wordmarkParams=new LinearLayout.LayoutParams(-2,-2);wordmarkParams.topMargin=dp(18);
         loading.addView(wordmark,wordmarkParams);
-        status=label("Łączenie z Rivestream…",12,0xff9a9a9a);
+        status=label("Connecting to Rivestream…",12,0xff9a9a9a);
         status.setGravity(Gravity.CENTER);status.setLetterSpacing(.04f);
         status.setPadding(dp(24),dp(6),dp(24),dp(16));
         loading.addView(status);
-        Button retry=makeButton("Odśwież");
+        Button retry=makeButton("Refresh");
         retry.setOnClickListener(v->web.reload());
         retry.setVisibility(View.GONE);
         loading.addView(retry,new LinearLayout.LayoutParams(dp(140),dp(32)));
@@ -193,9 +193,9 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         errorBar.setPadding(dp(18),dp(8),dp(10),dp(8));errorBar.setBackground(errorBackground());errorBar.setElevation(dp(8));
         errorText=label("",12,Color.WHITE);errorText.setMaxLines(2);errorText.setEllipsize(android.text.TextUtils.TruncateAt.END);
         errorBar.addView(errorText,new LinearLayout.LayoutParams(0,-2,1));
-        errorRetry=makeButton("Odśwież");errorRetry.setOnClickListener(v->{web.requestFocus();if(sourceError){sourceError=false;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);});}else web.reload();});
+        errorRetry=makeButton("Refresh");errorRetry.setOnClickListener(v->{web.requestFocus();if(sourceError){sourceError=false;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);});}else web.reload();});
         LinearLayout.LayoutParams retryParams=new LinearLayout.LayoutParams(dp(105),dp(32));retryParams.leftMargin=dp(8);errorBar.addView(errorRetry,retryParams);
-        Button dismissError=makeButton("Zamknij");dismissError.setOnClickListener(v->{errorBar.setVisibility(View.GONE);if(!pageFailed)watchQuick.setVisibility(View.GONE);web.requestFocus();});
+        Button dismissError=makeButton("Close");dismissError.setOnClickListener(v->{errorBar.setVisibility(View.GONE);if(!pageFailed)watchQuick.setVisibility(View.GONE);web.requestFocus();});
         LinearLayout.LayoutParams dismissParams=new LinearLayout.LayoutParams(dp(95),dp(32));dismissParams.leftMargin=dp(8);errorBar.addView(dismissError,dismissParams);
         View.OnKeyListener errorKeys=(v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_DOWN){if(event.getAction()==KeyEvent.ACTION_DOWN)web.requestFocus();return true;}return false;};
         errorRetry.setOnKeyListener(errorKeys);dismissError.setOnKeyListener(errorKeys);
@@ -209,10 +209,10 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(dp(88),dp(32));modeParams.leftMargin=dp(8);errorPlayback.addView(button,modeParams);
         }
         errorBar.addView(errorPlayback,1,new LinearLayout.LayoutParams(-2,-2));errorPlayback.setVisibility(View.GONE);
-        errorCursor=makeButton("Kursor");errorCursor.setOnKeyListener(errorKeys);
+        errorCursor=makeButton("Cursor");errorCursor.setOnKeyListener(errorKeys);
         errorCursor.setOnClickListener(v->{if(!pointerMode)togglePointer();cursor.x=captchaX*web.getWidth();cursor.y=captchaY*web.getHeight();cursor.invalidate();web.requestFocus();});
         LinearLayout.LayoutParams cursorParams=new LinearLayout.LayoutParams(dp(95),dp(32));cursorParams.leftMargin=dp(8);errorBar.addView(errorCursor,2,cursorParams);errorCursor.setVisibility(View.GONE);
-        watchQuick=makeButton("⋮");watchQuick.setBackgroundResource(R.drawable.circle_button);watchQuick.setTextSize(18);watchQuick.setPadding(0,0,0,0);watchQuick.setTextColor(Color.WHITE);watchQuick.setContentDescription("Opcje odtwarzania");watchQuick.setOnClickListener(v->showMenu());
+        watchQuick=makeButton("⋮");watchQuick.setBackgroundResource(R.drawable.circle_button);watchQuick.setTextSize(18);watchQuick.setPadding(0,0,0,0);watchQuick.setTextColor(Color.WHITE);watchQuick.setContentDescription("Playback options");watchQuick.setOnClickListener(v->showMenu());
         watchQuick.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_LEFT){if(event.getAction()==KeyEvent.ACTION_DOWN)web.requestFocus();return true;}return false;});
         FrameLayout.LayoutParams quickParams=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.RIGHT|Gravity.BOTTOM);quickParams.rightMargin=dp(12);quickParams.bottomMargin=dp(12);
         watchQuick.setVisibility(View.GONE);content.addView(watchQuick,quickParams);
@@ -236,9 +236,9 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 if(!request.isForMainFrame()) return adHost(uri.getHost());
                 if(isRive(uri)) return false;
                 String current=w.getUrl();
-                if(adHost(uri.getHost()) || !"https".equals(uri.getScheme()) || (current!=null && isRive(Uri.parse(current)) && "/watch".equals(Uri.parse(current).getPath()))){blockedNotice("Zablokowano przekierowanie reklamy.");return true;}
+                if(adHost(uri.getHost()) || !"https".equals(uri.getScheme()) || (current!=null && isRive(Uri.parse(current)) && "/watch".equals(Uri.parse(current).getPath()))){blockedNotice("Blocked an ad redirect.");return true;}
                 if(request.hasGesture()) {
-                    showTvDialog("Link poza Rivestream",uri.getHost(),new String[]{"Anuluj","Otwórz"},new Runnable[]{null,()->web.loadUrl(uri.toString())},false);
+                    showTvDialog("Link outside Rivestream",uri.getHost(),new String[]{"Cancel","Open"},new Runnable[]{null,()->web.loadUrl(uri.toString())},false);
                 }
                 return true;
             }
@@ -254,11 +254,11 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             @Override public void doUpdateVisitedHistory(WebView w,String url,boolean reload){updateNavigation(url);if(!url.equals(loadingUrl))beginLoading(url);}
             @Override public void onReceivedError(WebView w,WebResourceRequest req,WebResourceError error){
                 if(!req.isForMainFrame())return;
-                showError("Nie udało się wczytać strony.\nSprawdź internet i wybierz Odśwież.");
+                showError("Could not load the page.\nCheck your connection and select Refresh.");
             }
             @Override public void onReceivedHttpError(WebView w,WebResourceRequest req,android.webkit.WebResourceResponse response){
                 if(!req.isForMainFrame() && response.getStatusCode()==403 && "primesrc.me".equals(req.getUrl().getHost()) && "/api/v1/l".equals(req.getUrl().getPath()))showSourceError();
-                if(req.isForMainFrame() && response.getStatusCode()>=400)showError("Serwer zwrócił błąd "+response.getStatusCode()+".\nSpróbuj ponownie za chwilę.");
+                if(req.isForMainFrame() && response.getStatusCode()>=400)showError("The server returned error "+response.getStatusCode()+".\nTry again in a moment.");
             }
             @Override public boolean onRenderProcessGone(WebView w,android.webkit.RenderProcessGoneDetail detail){
                 // Activity recreation destroys the failed renderer and restores a usable browser.
@@ -267,17 +267,17 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         });
         web.setWebChromeClient(new WebChromeClient(){
             @Override public boolean onJsAlert(WebView view,String url,String message,JsResult result){
-                showTvDialog("Rivestream",message,new String[]{"Rozumiem"},new Runnable[]{result::confirm},false);
+                showTvDialog("Rivestream",message,new String[]{"Got it"},new Runnable[]{result::confirm},false);
                 activeDialog.setOnCancelListener(d->result.cancel());return true;
             }
             @Override public boolean onJsConfirm(WebView view,String url,String message,JsResult result){
-                showTvDialog("Potwierdź wybór",message,new String[]{"Anuluj","Potwierdź"},new Runnable[]{result::cancel,result::confirm},false);
+                showTvDialog("Confirm choice",message,new String[]{"Cancel","Confirm"},new Runnable[]{result::cancel,result::confirm},false);
                 activeDialog.setOnCancelListener(d->result.cancel());return true;
             }
             @Override public boolean onJsPrompt(WebView view,String url,String message,String defaultValue,JsPromptResult result){
                 EditText input=new EditText(MainActivity.this);input.setSingleLine(true);input.setText(defaultValue);input.setTextColor(Color.WHITE);input.setTextSize(13);input.setTypeface(interRegular);input.setHintTextColor(0xff808080);
                 input.setBackground(inputBackground());input.setPadding(dp(11),dp(6),dp(16),dp(6));
-                showTvDialog("Wpisz odpowiedź",message,new String[]{"Anuluj","Zapisz"},new Runnable[]{result::cancel,()->result.confirm(input.getText().toString())},false,input);
+                showTvDialog("Enter a response",message,new String[]{"Cancel","Save"},new Runnable[]{result::cancel,()->result.confirm(input.getText().toString())},false,input);
                 activeDialog.setOnCancelListener(d->result.cancel());return true;
             }
             @Override public void onShowCustomView(View view,CustomViewCallback callback){
@@ -289,7 +289,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 immersive();
             }
             @Override public void onHideCustomView(){hideFullscreen();}
-            @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean gesture,android.os.Message result){blockedNotice("Zablokowano wyskakujące okno.");return false;}
+            @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean gesture,android.os.Message result){blockedNotice("Blocked a pop-up.");return false;}
         });
         setContentView(root);
         web.requestFocus();
@@ -336,7 +336,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         sourceError=false;captchaKind=null;errorCursor.setVisibility(View.GONE);watchQuick.setVisibility(View.GONE);loadingUrl=url;pageFailed=false;pageGeneration++;loadingStarted=SystemClock.uptimeMillis();
         loading.animate().cancel();loading.setAlpha(1f);
         progress.setVisibility(View.VISIBLE);
-        status.setText("/watch".equals(Uri.parse(url).getPath())?"Przygotowuję odtwarzacz…":"Ładuję Twoje kino…");
+        status.setText("/watch".equals(Uri.parse(url).getPath())?"Preparing the player…":"Loading your cinema…");
         loading.getChildAt(loading.getChildCount()-1).setVisibility(View.GONE);
         loading.setVisibility(View.VISIBLE);
         if(isRive(Uri.parse(url))){pollPageReady(pageGeneration);monitorCaptcha(pageGeneration);}
@@ -372,7 +372,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             web.evaluateJavascript(stateScript,result->{
                 if(web==null || generation!=pageGeneration || pageFailed)return;
                 if("\"source-changed\"".equals(result)){sourceError=false;watchQuick.setVisibility(View.GONE);errorBar.setVisibility(View.GONE);}
-                if("\"error\"".equals(result) && customView==null)showError("Wystąpił błąd strony.\nWybierz Odśwież, aby spróbować ponownie.");
+                if("\"error\"".equals(result) && customView==null)showError("The page ran into an error.\nSelect Refresh to try again.");
                 else monitorPageError(generation);
             });
         },1500);
@@ -399,8 +399,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                             monitorPageError(generation);
                         }
                     });
-                }else if("\"error\"".equals(result))showError("Wystąpił błąd strony podczas uruchamiania.\nWybierz Odśwież, aby spróbować ponownie.");
-                else if(SystemClock.uptimeMillis()-loadingStarted>30000)showError("Wczytywanie trwa zbyt długo.\nSprawdź połączenie lub wybierz Odśwież.");
+                }else if("\"error\"".equals(result))showError("The page failed while starting.\nSelect Refresh to try again.");
+                else if(SystemClock.uptimeMillis()-loadingStarted>30000)showError("Loading is taking too long.\nCheck your connection or select Refresh.");
                 else pollPageReady(generation);
             });
         },250);
@@ -481,7 +481,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         if(customView!=null && cursor.getParent()!=root)root.addView(detachCursor(),new FrameLayout.LayoutParams(-1,-1));
         cursor.x=cursor.getWidth()/2f;cursor.y=cursor.getHeight()/2f;
         cursor.setVisibility(pointerMode?View.VISIBLE:View.GONE);cursor.invalidate();
-        showNotice(pointerMode?"Kursor włączony  ·  Strzałki przesuwają  ·  OK wybiera":"Nawigacja pilotem włączona");
+        showNotice(pointerMode?"Cursor on  ·  Arrows move  ·  OK selects":"Remote navigation on");
         web.requestFocus();
         syncWebFocus(!pointerMode);
     }
@@ -494,14 +494,14 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         web.evaluateJavascript("localStorage.setItem('RiveStreamWatchMode',"+JSONObject.quote(mode)+");localStorage.setItem('RiveStreamEmbedMode','"+("embed".equals(mode)?"true":"false")+"');document.querySelectorAll('video,audio').forEach(function(v){v.pause();});",result->{if(web!=null){web.reload();web.requestFocus();}});
     }
     private void showPlaybackMenu(){
-        showTvDialog("Odtwarzanie","Wybierz tryb lub źródło",new String[]{"Direct","Embed","Serwery","Zamknij reklamę","Opcje aplikacji"},new Runnable[]{()->setPlaybackMode("direct"),()->setPlaybackMode("embed"),()->{if(pageFailed){setPlaybackMode("embed");}else web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);else showNotice("Wybór serwera pojawi się po wczytaniu odtwarzacza.");});},this::dismissAds,()->showAppMenu()},true);
+        showTvDialog("Playback","Choose a mode or source",new String[]{"Direct","Embed","Servers","Close ad","App options"},new Runnable[]{()->setPlaybackMode("direct"),()->setPlaybackMode("embed"),()->{if(pageFailed){setPlaybackMode("embed");}else web.evaluateJavascript("window.RiveTV && RiveTV.sources()",result->{if("\"dropdown\"".equals(result))showCustomSelect(0);else showNotice("Server choice appears once the player loads.");});},this::dismissAds,()->showAppMenu()},true);
     }
     private void dismissAds(){
         if(web==null)return;
         web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.dismiss() : -1",before->handler.postDelayed(()->{
             if(web!=null)web.evaluateJavascript("window.RiveTVAds ? RiveTVAds.removed() : -1",after->{
                 web.requestFocus();
-                showNotice(!before.equals(after)?"Zamknięto wyskakujące okno.":"Nie znaleziono okna do zamknięcia. Włącz kursor (przytrzymaj OK) i kliknij X.");
+                showNotice(!before.equals(after)?"Closed a pop-up.":"No window to close. Turn on the cursor (hold OK) and click X.");
             });
         },600));
     }
@@ -511,7 +511,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     }
     private void showAppMenu(){
         if(keyboardOpen())finishKeyboardEditing();
-        String[] actions={"Strona główna","Szukaj",pointerMode?"Wyłącz kursor":"Włącz kursor","Odśwież stronę","Aktualizacje · "+BuildConfig.VERSION_NAME,"Sterowanie i informacje"};
+        String[] actions={"Home","Search",pointerMode?"Cursor off":"Cursor on","Reload page","Updates · "+BuildConfig.VERSION_NAME,"Controls and info"};
         Runnable[] callbacks=new Runnable[actions.length];
         for(int i=0;i<actions.length;i++){final int index=i;callbacks[i]=()->{
             switch(index){
@@ -523,25 +523,25 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
                 default:showHelp();
             }
         };}
-        showTvDialog("Opcje odtwarzania i aplikacji","RIVESTREAM TV  /  MENU PILOTA",actions,callbacks,true);
+        showTvDialog("Playback and app options","RIVESTREAM TV  /  REMOTE MENU",actions,callbacks,true);
     }
     @Override public boolean canInstallUpdate(){
         return !isFinishing() && hasWindowFocus() && activeDialog==null && !keyboardOpen() && customView==null && loading.getVisibility()!=View.VISIBLE && web!=null && web.getUrl()!=null && isRive(Uri.parse(web.getUrl())) && !"/watch".equals(Uri.parse(web.getUrl()).getPath());
     }
     @Override public void updateMessage(String message,boolean explicit){
-        if(explicit)showTvDialog("Aktualizacje",message,new String[]{"Zamknij"},new Runnable[]{null},false);
+        if(explicit)showTvDialog("Updates",message,new String[]{"Close"},new Runnable[]{null},false);
         else showNotice(message);
     }
     @Override public void updateReady(String version,Runnable install,Runnable later){
-        showTvDialog("Aktualizacja "+version,"Nowa wersja jest pobrana i gotowa do instalacji.",new String[]{"Zainstaluj","Później"},new Runnable[]{install,later},false);
+        showTvDialog("Update "+version,"A new version is downloaded and ready to install.",new String[]{"Install","Later"},new Runnable[]{install,later},false);
     }
     @Override public void updatePermission(Runnable settings,Runnable later){
-        showTvDialog("Aktualizacje bez pendrive’a","Zezwól Rivestream TV na instalowanie aktualizacji. W ustawieniach telewizora włącz zgodę dla tej aplikacji, a następnie wróć przyciskiem Wstecz.",new String[]{"Otwórz ustawienia","Później"},new Runnable[]{settings,later},false);
+        showTvDialog("Updates without a USB drive","Allow Rivestream TV to install updates. Turn on the permission for this app in the TV settings, then come back with Back.",new String[]{"Open settings","Later"},new Runnable[]{settings,later},false);
     }
     private void showHelp(){
         android.content.pm.PackageInfo engine=WebView.getCurrentWebViewPackage();
         String version=engine==null?"brak":engine.versionName;
-        showTvDialog("Sterowanie pilotem","Strzałki — wybór elementów\nOK — otwórz / wybierz\nPrzytrzymaj OK — kursor w odtwarzaczu\nMenu lub F1 — opcje aplikacji\nWstecz — pełny ekran / poprzednia strona\nPlay / pauza — sterowanie dostępnym wideo\n\nGdy odtwarzacz nie reaguje na strzałki, włącz kursor.\n\nRivestream TV "+BuildConfig.VERSION_NAME+" · Android "+android.os.Build.VERSION.RELEASE+" · WebView "+version,new String[]{"Rozumiem"},new Runnable[]{null},false);
+        showTvDialog("Remote controls","Arrows — move between items\nOK — open / select\nHold OK — cursor in the player\nMenu or F1 — app options\nBack — controls, then Back again to leave a video\nPlay / pause — control the video\n\nIf the player ignores the arrows, turn on the cursor.\n\nRivestream TV "+BuildConfig.VERSION_NAME+" · Android "+android.os.Build.VERSION.RELEASE+" · WebView "+version,new String[]{"Got it"},new Runnable[]{null},false);
     }
     private GradientDrawable panelBackground(int color,int radius){GradientDrawable bg=new GradientDrawable();bg.setColor(color);bg.setCornerRadius(dp(radius));return bg;}
     private Drawable errorBackground(){
@@ -618,7 +618,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         stopArrowNavigation();
         EditText editor=new EditText(this);searchEditor=editor;
         editor.setSingleLine(true);editor.setTextSize(13);editor.setTypeface(interRegular);editor.setTextColor(Color.WHITE);editor.setHintTextColor(0xff808080);
-        editor.setHint("Wpisz tytuł filmu lub serialu");editor.setContentDescription("Wyszukaj tytuł");
+        editor.setHint("Type a movie or show title");editor.setContentDescription("Search titles");
         editor.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         editor.setImeOptions(EditorInfo.IME_ACTION_SEARCH|EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         GradientDrawable bg=inputBackground();bg.setColor(0xff000000);bg.setStroke(dp(2),Color.WHITE);editor.setBackground(bg);editor.setPadding(dp(35),dp(6),dp(16),dp(6));
@@ -722,8 +722,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             callbacks.add(()->web.evaluateJavascript("window.RiveTV && RiveTV.choose("+index+")",result->{if(multiple)activate();}));
         }
         if(labels.isEmpty())return;
-        if(multiple){labels.add("Gotowe");callbacks.add(null);}
-        showTvDialog("Wybierz opcję",multiple?"OK zaznacza; Gotowe zamyka listę.":"Strzałki wybierają  ·  OK zatwierdza  ·  Wstecz anuluje",labels.toArray(new String[0]),callbacks.toArray(new Runnable[0]),true);
+        if(multiple){labels.add("Done");callbacks.add(null);}
+        showTvDialog("Choose an option",multiple?"OK selects; Done closes the list.":"Arrows choose  ·  OK confirms  ·  Back cancels",labels.toArray(new String[0]),callbacks.toArray(new Runnable[0]),true);
         if(target.optBoolean("custom"))activeDialog.setOnCancelListener(d->web.evaluateJavascript("window.RiveTV && RiveTV.closeDropdown()",null));
         ViewGroup panel=(ViewGroup)activeDialog.findViewById(android.R.id.content);
         View selected=panel.findViewWithTag("rive-dialog-action-"+selectedIndex);if(selected!=null)selected.requestFocus();
@@ -732,7 +732,7 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         if(web==null || activeDialog!=null)return;
         web.evaluateJavascript("window.RiveTV && RiveTV.dropdown()",raw->{
             try{JSONObject target=new JSONObject(raw);showSelect(target);}
-            catch(Exception ignored){if(attempt<30)handler.postDelayed(()->showCustomSelect(attempt+1),40);else {web.evaluateJavascript("window.RiveTV && RiveTV.closeDropdown()",null);showNotice("Nie udało się otworzyć listy. Spróbuj ponownie.");}}
+            catch(Exception ignored){if(attempt<30)handler.postDelayed(()->showCustomSelect(attempt+1),40);else {web.evaluateJavascript("window.RiveTV && RiveTV.closeDropdown()",null);showNotice("Could not open the list. Try again.");}}
         });
     }
     private void tap(float x,float y){
@@ -766,11 +766,11 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
     private void startVoiceSearch(){
         android.content.Intent intent=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH);
-        intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,"pl-PL");
-        intent.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT,"Powiedz tytuł filmu lub serialu");
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,"en-US");
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT,"Say a movie or show title");
         intent.setPackage("com.google.android.katniss");
         if(intent.resolveActivity(getPackageManager())==null)intent.setPackage(null);
-        try{startActivityForResult(intent,VOICE_SEARCH);}catch(android.content.ActivityNotFoundException e){showNotice("Wyszukiwanie głosowe jest niedostępne na tym telewizorze.");}
+        try{startActivityForResult(intent,VOICE_SEARCH);}catch(android.content.ActivityNotFoundException e){showNotice("Voice search is not available on this TV.");}
     }
     @Override protected void onActivityResult(int request,int result,android.content.Intent data){
         super.onActivityResult(request,result,data);
@@ -837,14 +837,28 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
         hover.setSource(android.view.InputDevice.SOURCE_MOUSE);target.dispatchGenericMotionEvent(hover);hover.recycle();
     }
     private void goBack(){
+        boolean watch=web!=null && web.getUrl()!=null && "/watch".equals(Uri.parse(web.getUrl()).getPath());
+        long now=SystemClock.uptimeMillis();
+        if(watch && now-watchBackAt<5000){
+            watchBackAt=0;
+            if(pointerMode)togglePointer();
+            hideFullscreen();finishBack();
+            return;
+        }
+        watchBackAt=watch?now:0;
         if(customView!=null){hideFullscreen();return;}
         if(pointerMode){togglePointer();return;}
-        if(web!=null){web.evaluateJavascript("window.RiveTV && (RiveTV.closeDropdown() || RiveTV.revealPlayback() || RiveTV.releasePlayer())",result->{if(!"true".equals(result))finishBack();});return;}
+        if(web!=null){web.evaluateJavascript("window.RiveTV && (RiveTV.closeDropdown() || RiveTV.revealPlayback() || RiveTV.releasePlayer())",result->{if(!"true".equals(result)){watchBackAt=0;finishBack();}});return;}
         finishBack();
     }
     private void finishBack(){
         Uri current=web==null || web.getUrl()==null?null:Uri.parse(web.getUrl());
         String path=current==null?null:current.getPath();
+        if("/watch".equals(path)){
+            leftWatchAt=SystemClock.uptimeMillis();hideFullscreen();
+            web.evaluateJavascript("(function(){if(window.RiveTVPlayback)RiveTVPlayback.flush();if(window.next&&next.router){next.router.push('/');return true;}return false;})()",result->{if(!"true".equals(result))web.loadUrl(HOME);});
+            return;
+        }
         if(current!=null && isRive(current) && path!=null && !path.isEmpty() && !"/".equals(path)){
             android.webkit.WebBackForwardList list=web.copyBackForwardList();
             for(int i=list.getCurrentIndex()-1;i>=0;i--){
@@ -854,7 +868,8 @@ public final class MainActivity extends Activity implements AppUpdater.Host {
             hideFullscreen();web.loadUrl(HOME);return;
         }
         if(current!=null && !isRive(current) && web.canGoBack()){web.goBack();return;}
-        showTvDialog("Kończysz oglądanie?","Możesz wrócić do Rivestream w dowolnej chwili.",new String[]{"Zostań","Zamknij aplikację"},new Runnable[]{null,()->finish()},false);
+        if(SystemClock.uptimeMillis()-leftWatchAt<3000 || loading.getVisibility()==View.VISIBLE)return;
+        showTvDialog("Done watching?","You can come back to Rivestream any time.",new String[]{"Stay","Exit app"},new Runnable[]{null,()->finish()},false);
     }
     @Override public void onBackPressed(){goBack();}
     @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);if(web!=null)web.saveState(state);}

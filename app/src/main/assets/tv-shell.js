@@ -4,22 +4,22 @@
   var PATHS = ['/', '/movie', '/tv', '/library', '/search', '/detail'];
   var IMG = 'https://image.tmdb.org/t/p/';
   var ASSETS = 'https://rivetv.assets/';
-  var LANG = 'pl-PL';
+  var LANG = 'en-US';
   var ROW_Y = 500, GRID_Y = 260, COLUMNS = 6;
   var KEYS = 'abcdefghijklmnopqrstuvwxyz1234567890'.split('');
   var NAV = [
-    {id:'home', label:'Strona główna'},
-    {id:'tv', label:'Seriale'},
-    {id:'movie', label:'Filmy'},
-    {id:'new', label:'Nowe i popularne'},
-    {id:'list', label:'Moja lista'},
-    {id:'lang', label:'Przeglądaj według języka'}
+    {id:'home', label:'Home'},
+    {id:'tv', label:'TV Shows'},
+    {id:'movie', label:'Movies'},
+    {id:'new', label:'New & Popular'},
+    {id:'list', label:'My List'},
+    {id:'lang', label:'Browse by Language'}
   ];
   var LANGUAGES = [
-    {label:'Polski', country:'PL'}, {label:'Angielski', country:'US'}, {label:'Brytyjski angielski', country:'GB'},
-    {label:'Koreański', country:'KR'}, {label:'Japoński', country:'JP'}, {label:'Hiszpański', country:'ES'},
-    {label:'Francuski', country:'FR'}, {label:'Niemiecki', country:'DE'}, {label:'Włoski', country:'IT'},
-    {label:'Turecki', country:'TR'}, {label:'Hindi', country:'IN'}, {label:'Duński', country:'DK'}
+    {label:'Polish', country:'PL'}, {label:'English', country:'US'}, {label:'British English', country:'GB'},
+    {label:'Korean', country:'KR'}, {label:'Japanese', country:'JP'}, {label:'Spanish', country:'ES'},
+    {label:'French', country:'FR'}, {label:'German', country:'DE'}, {label:'Italian', country:'IT'},
+    {label:'Turkish', country:'TR'}, {label:'Hindi', country:'IN'}, {label:'Danish', country:'DK'}
   ];
   var icons = {
     play:'<svg viewBox="0 0 24 24"><path d="M18.38 11.04c.78.4.78 1.51 0 1.92L4.58 20.17A1.08 1.08 0 0 1 3 19.22V4.78c0-.81.86-1.33 1.58-.95z" fill="currentColor"/></svg>',
@@ -169,14 +169,10 @@
   function esc(text) {
     return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
   }
-  function plural(n, one, few, many) {
-    var t = n % 100, u = n % 10;
-    return n === 1 ? one : (u >= 2 && u <= 4 && (t < 12 || t > 14)) ? few : many;
-  }
   function duration(minutes) {
     if (!minutes) return '';
     var h = Math.floor(minutes / 60), m = minutes % 60;
-    return h ? h + ' godz.' + (m ? ' ' + m + ' min' : '') : m + ' min';
+    return h ? h + 'h' + (m ? ' ' + m + 'm' : '') : m + 'm';
   }
   function image(path, size) { return path ? IMG + size + path : ''; }
   function today() { return new Date().toISOString().slice(0, 10); }
@@ -279,7 +275,7 @@
     if (logoFor.cache[key] !== undefined) { item.logo = logoFor.cache[key]; return Promise.resolve(item.logo); }
     return request({requestID:item.type === 'tv' ? 'tvImages' : 'movieImages', id:item.id}).then(function (data) {
       var logos = (data && data.logos) || [], pick = null;
-      ['pl', 'en', null].some(function (lang) {
+      ['en', null].some(function (lang) {
         pick = logos.filter(function (l) { return l.iso_639_1 === lang && !/\.svg$/.test(l.file_path); })[0];
         return !!pick;
       });
@@ -371,54 +367,54 @@
   var sections = {
     home:function () {
       return [
-        {key:'cw', title:'Kontynuuj oglądanie', kind:'cw', load:function () { return continueEntries().then(fromIds); }},
-        {key:'trend', title:'Dopasowane dla Ciebie', load:function () { return results({requestID:'trending', page:1}); }, hero:true},
-        {key:'new', title:'Nowości na Rive', load:function () { return results({requestID:'latestMovie', page:1}, 'movie'); }},
-        {key:'top-movie', title:'Top 10 filmów w Polsce dzisiaj', kind:'top', load:function () { return results({requestID:'trendingMovieDay', page:1}, 'movie', 10); }},
-        {key:'love', title:'Myślimy, że to pokochasz', load:function () { return results({requestID:'popularMovie', page:1}, 'movie'); }},
-        {key:'list', title:'Moja lista', load:function () { return loadWatchlist().then(listItems); }},
-        {key:'anim', title:'Animacja', load:function () { return results({requestID:'filterMovie', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'movie'); }},
-        {key:'drama', title:'Inspirujące filmy', load:function () { return results({requestID:'filterMovie', genreKeywords:'18', sortBy:'popularity.desc', page:1}, 'movie'); }},
-        {key:'weekend', title:'Do obejrzenia w jeden weekend', load:function () { return results({requestID:'popularTv', page:1}, 'tv'); }},
-        {key:'top-tv', title:'Top 10 seriali w Polsce dzisiaj', kind:'top', load:function () { return results({requestID:'trendingTvDay', page:1}, 'tv', 10); }},
-        {key:'critics', title:'Filmy docenione przez krytyków', load:function () { return results({requestID:'topRatedMovie', page:1}, 'movie'); }},
-        {key:'fresh', title:'Dzisiejsze świeże propozycje', load:function () { return results({requestID:'onTheAirTv', page:1}, 'tv'); }},
-        {key:'adult', title:'Animacja dla dorosłych', load:function () { return results({requestID:'filterTv', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'tv'); }}
+        {key:'cw', title:'Continue Watching', kind:'cw', load:function () { return continueEntries().then(fromIds); }},
+        {key:'trend', title:'Picked for You', load:function () { return results({requestID:'trending', page:1}); }, hero:true},
+        {key:'new', title:'New on Rive', load:function () { return results({requestID:'latestMovie', page:1}, 'movie'); }},
+        {key:'top-movie', title:'Top 10 Movies in Poland Today', kind:'top', load:function () { return results({requestID:'trendingMovieDay', page:1}, 'movie', 10); }},
+        {key:'love', title:'We Think You’ll Love These', load:function () { return results({requestID:'popularMovie', page:1}, 'movie'); }},
+        {key:'list', title:'My List', load:function () { return loadWatchlist().then(listItems); }},
+        {key:'anim', title:'Animation', load:function () { return results({requestID:'filterMovie', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'movie'); }},
+        {key:'drama', title:'Inspiring Movies', load:function () { return results({requestID:'filterMovie', genreKeywords:'18', sortBy:'popularity.desc', page:1}, 'movie'); }},
+        {key:'weekend', title:'Binge in a Weekend', load:function () { return results({requestID:'popularTv', page:1}, 'tv'); }},
+        {key:'top-tv', title:'Top 10 Shows in Poland Today', kind:'top', load:function () { return results({requestID:'trendingTvDay', page:1}, 'tv', 10); }},
+        {key:'critics', title:'Critically Acclaimed Movies', load:function () { return results({requestID:'topRatedMovie', page:1}, 'movie'); }},
+        {key:'fresh', title:'Fresh Picks Today', load:function () { return results({requestID:'onTheAirTv', page:1}, 'tv'); }},
+        {key:'adult', title:'Adult Animation', load:function () { return results({requestID:'filterTv', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'tv'); }}
       ];
     },
     tv:function () {
       return [
-        {key:'tv-pop', title:'Popularne seriale', load:function () { return results({requestID:'popularTv', page:1}, 'tv'); }, hero:true},
-        {key:'top-tv', title:'Top 10 seriali w Polsce dzisiaj', kind:'top', load:function () { return results({requestID:'trendingTvDay', page:1}, 'tv', 10); }},
-        {key:'tv-air', title:'Nowe odcinki', load:function () { return results({requestID:'onTheAirTv', page:1}, 'tv'); }},
-        {key:'tv-today', title:'Emitowane dzisiaj', load:function () { return results({requestID:'latestTv', page:1}, 'tv'); }},
-        {key:'tv-crime', title:'Seriale kryminalne', load:function () { return results({requestID:'filterTv', genreKeywords:'80', sortBy:'popularity.desc', page:1}, 'tv'); }},
-        {key:'tv-comedy', title:'Seriale komediowe', load:function () { return results({requestID:'filterTv', genreKeywords:'35', sortBy:'popularity.desc', page:1}, 'tv'); }},
-        {key:'adult', title:'Anime i animacja', load:function () { return results({requestID:'filterTv', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'tv'); }},
-        {key:'tv-scifi', title:'Sci-fi i fantasy', load:function () { return results({requestID:'filterTv', genreKeywords:'10765', sortBy:'popularity.desc', page:1}, 'tv'); }},
-        {key:'tv-top', title:'Najwyżej oceniane seriale', load:function () { return results({requestID:'topRatedTv', page:1}, 'tv'); }}
+        {key:'tv-pop', title:'Popular Shows', load:function () { return results({requestID:'popularTv', page:1}, 'tv'); }, hero:true},
+        {key:'top-tv', title:'Top 10 Shows in Poland Today', kind:'top', load:function () { return results({requestID:'trendingTvDay', page:1}, 'tv', 10); }},
+        {key:'tv-air', title:'New Episodes', load:function () { return results({requestID:'onTheAirTv', page:1}, 'tv'); }},
+        {key:'tv-today', title:'Airing Today', load:function () { return results({requestID:'latestTv', page:1}, 'tv'); }},
+        {key:'tv-crime', title:'Crime Shows', load:function () { return results({requestID:'filterTv', genreKeywords:'80', sortBy:'popularity.desc', page:1}, 'tv'); }},
+        {key:'tv-comedy', title:'Comedy Shows', load:function () { return results({requestID:'filterTv', genreKeywords:'35', sortBy:'popularity.desc', page:1}, 'tv'); }},
+        {key:'adult', title:'Anime & Animation', load:function () { return results({requestID:'filterTv', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'tv'); }},
+        {key:'tv-scifi', title:'Sci-Fi & Fantasy', load:function () { return results({requestID:'filterTv', genreKeywords:'10765', sortBy:'popularity.desc', page:1}, 'tv'); }},
+        {key:'tv-top', title:'Top Rated Shows', load:function () { return results({requestID:'topRatedTv', page:1}, 'tv'); }}
       ];
     },
     movie:function () {
       return [
-        {key:'movie-pop', title:'Popularne filmy', load:function () { return results({requestID:'popularMovie', page:1}, 'movie'); }, hero:true},
-        {key:'top-movie', title:'Top 10 filmów w Polsce dzisiaj', kind:'top', load:function () { return results({requestID:'trendingMovieDay', page:1}, 'movie', 10); }},
-        {key:'new', title:'Nowości', load:function () { return results({requestID:'latestMovie', page:1}, 'movie'); }},
-        {key:'movie-action', title:'Filmy akcji', load:function () { return results({requestID:'filterMovie', genreKeywords:'28', sortBy:'popularity.desc', page:1}, 'movie'); }},
-        {key:'movie-comedy', title:'Komedie', load:function () { return results({requestID:'filterMovie', genreKeywords:'35', sortBy:'popularity.desc', page:1}, 'movie'); }},
-        {key:'movie-horror', title:'Horrory', load:function () { return results({requestID:'filterMovie', genreKeywords:'27', sortBy:'popularity.desc', page:1}, 'movie'); }},
-        {key:'anim', title:'Animacja', load:function () { return results({requestID:'filterMovie', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'movie'); }},
-        {key:'critics', title:'Filmy docenione przez krytyków', load:function () { return results({requestID:'topRatedMovie', page:1}, 'movie'); }}
+        {key:'movie-pop', title:'Popular Movies', load:function () { return results({requestID:'popularMovie', page:1}, 'movie'); }, hero:true},
+        {key:'top-movie', title:'Top 10 Movies in Poland Today', kind:'top', load:function () { return results({requestID:'trendingMovieDay', page:1}, 'movie', 10); }},
+        {key:'new', title:'New Releases', load:function () { return results({requestID:'latestMovie', page:1}, 'movie'); }},
+        {key:'movie-action', title:'Action Movies', load:function () { return results({requestID:'filterMovie', genreKeywords:'28', sortBy:'popularity.desc', page:1}, 'movie'); }},
+        {key:'movie-comedy', title:'Comedies', load:function () { return results({requestID:'filterMovie', genreKeywords:'35', sortBy:'popularity.desc', page:1}, 'movie'); }},
+        {key:'movie-horror', title:'Horror', load:function () { return results({requestID:'filterMovie', genreKeywords:'27', sortBy:'popularity.desc', page:1}, 'movie'); }},
+        {key:'anim', title:'Animation', load:function () { return results({requestID:'filterMovie', genreKeywords:'16', sortBy:'popularity.desc', page:1}, 'movie'); }},
+        {key:'critics', title:'Critically Acclaimed Movies', load:function () { return results({requestID:'topRatedMovie', page:1}, 'movie'); }}
       ];
     },
     'new':function () {
       return [
-        {key:'new', title:'Nowości na Rive', load:function () { return results({requestID:'latestMovie', page:1}, 'movie'); }},
-        {key:'tv-air', title:'Nowe odcinki', load:function () { return results({requestID:'onTheAirTv', page:1}, 'tv'); }},
-        {key:'top-tv', title:'Top 10 seriali w Polsce dzisiaj', kind:'top', load:function () { return results({requestID:'trendingTvDay', page:1}, 'tv', 10); }},
-        {key:'top-movie', title:'Top 10 filmów w Polsce dzisiaj', kind:'top', load:function () { return results({requestID:'trendingMovieDay', page:1}, 'movie', 10); }},
-        {key:'week-movie', title:'Popularne w tym tygodniu', load:function () { return results({requestID:'trendingMovie', page:1}, 'movie'); }},
-        {key:'tv-today', title:'Emitowane dzisiaj', load:function () { return results({requestID:'latestTv', page:1}, 'tv'); }}
+        {key:'new', title:'New on Rive', load:function () { return results({requestID:'latestMovie', page:1}, 'movie'); }},
+        {key:'tv-air', title:'New Episodes', load:function () { return results({requestID:'onTheAirTv', page:1}, 'tv'); }},
+        {key:'top-tv', title:'Top 10 Shows in Poland Today', kind:'top', load:function () { return results({requestID:'trendingTvDay', page:1}, 'tv', 10); }},
+        {key:'top-movie', title:'Top 10 Movies in Poland Today', kind:'top', load:function () { return results({requestID:'trendingMovieDay', page:1}, 'movie', 10); }},
+        {key:'week-movie', title:'Popular This Week', load:function () { return results({requestID:'trendingMovie', page:1}, 'movie'); }},
+        {key:'tv-today', title:'Airing Today', load:function () { return results({requestID:'latestTv', page:1}, 'tv'); }}
       ];
     }
   };
@@ -489,8 +485,8 @@
   function cardHTML(item, kind, index, tops) {
     var badge = '';
     if (kind !== 'cw' && kind !== 'top') {
-      if (daysSince(item.date) < 45) badge = '<span class="badge">' + (item.type === 'tv' ? 'Nowy serial' : 'Ostatnio dodane') + '</span>';
-      else if (item.type === 'tv' && item.raw && item.raw.last_air_date && daysSince(item.raw.last_air_date) < 30) badge = '<span class="badge">Nowy sezon</span>';
+      if (daysSince(item.date) < 45) badge = '<span class="badge">' + (item.type === 'tv' ? 'New Show' : 'Recently Added') + '</span>';
+      else if (item.type === 'tv' && item.raw && item.raw.last_air_date && daysSince(item.raw.last_air_date) < 30) badge = '<span class="badge">New Season</span>';
     }
     if (kind === 'top') {
       return '<div class="cd t10" data-i="' + index + '"><span class="n">' + (index + 1) + '</span><div class="po" style="background-image:url(\'' + image(item.poster, 'w342') + '\')"></div></div>';
@@ -500,12 +496,12 @@
     return '<div class="cd" data-i="' + index + '" data-img="' + esc(image(item.backdrop || item.poster, 'w300')) + '">' + top + badge + '<span class="tt">' + esc(item.title) + '</span>' + bar + '</div>';
   }
   function heroHTML(item) {
-    var kicker = item.type === 'tv' ? 'Serial' : 'Film';
+    var kicker = item.type === 'tv' ? 'Series' : 'Movie';
     return '<div class="hero"><div class="bg" style="background-image:url(\'' + image(item.backdrop, 'w1280') + '\')"></div><div class="v1"></div><div class="v2"></div>' +
       '<div class="tp"><div class="kick">' + logoMark() + esc(kicker) + '</div><div class="art"><b>' + esc(item.title) + '</b></div>' +
       '<p class="hsyn">' + esc(item.overview) + '</p>' +
-      '<div class="btns"><div class="tb white" data-h="0">' + icons.play + '<span>Odtwórz</span></div><div class="tb grey" data-h="1">' + icons.info + '<span>Więcej informacji</span></div></div></div>' +
-      '<div class="rating"><span>' + esc(item.year || (item.type === 'tv' ? 'Serial' : 'Film')) + '</span></div></div>';
+      '<div class="btns"><div class="tb white" data-h="0">' + icons.play + '<span>Play</span></div><div class="tb grey" data-h="1">' + icons.info + '<span>More Info</span></div></div></div>' +
+      '<div class="rating"><span>' + esc(item.year || (item.type === 'tv' ? 'Series' : 'Movie')) + '</span></div></div>';
   }
   function logoMark() {
     return '<svg viewBox="0 0 36 36"><rect x="1" y="1" width="34" height="34" rx="9" fill="url(#rive-shell-logo)"/><path d="M7.6 8.2h6.3q7.9 0 7.9 5.5 0 3.9-3.9 5.1l4.7 7.5h-4.8l-4.3-7.1v7.1H7.6zm4.3 3.9v3.9h2q2.7 0 2.7-2t-2.7-1.9z" fill="#141414"/><path d="M14.7 23.5q-1.2-2.4.8-3.5 2-1.2 3.1 1.2l2.8 5.5 5.1-11.8q1.2-2.8 3.5-1.6 2.4 1.2 1.2 3.5L25.1 30.5q-1.2 2.8-3.5 2.8t-3.5-2.4z" fill="#141414"/></svg>';
@@ -517,7 +513,7 @@
     view = {section:section, blocks:[], hero:null};
     ready = false;
     el.spin.classList.add('on');
-    if (section === 'list') return renderGrid(token, 'Moja lista', loadWatchlist().then(listItems), 'Dodawaj filmy i seriale do Mojej listy, żeby łatwo do nich wrócić.', keepFocus);
+    if (section === 'list') return renderGrid(token, 'My List', loadWatchlist().then(listItems), 'Add movies and shows to My List to find them easily.', keepFocus);
     if (section === 'search') return renderSearch(token, keepFocus);
     if (section === 'lang') return renderLanguage(token, keepFocus);
     var specs = sections[section]();
@@ -630,7 +626,7 @@
     var html = '', tops = topIds(), grid = view.blocks[2], sugg = view.blocks[1];
     showQuery();
     items.forEach(function (item, i) { html += cardHTML(item, 'grid', i, tops); });
-    grid.el.innerHTML = items.length ? html : '<p class="empty" style="padding:0">Brak wyników. Spróbuj innego tytułu.</p>';
+    grid.el.innerHTML = items.length ? html : '<p class="empty" style="padding:0">No results. Try another title.</p>';
     grid.el.style.transform = '';
     grid.items = items;grid.cards = grid.el.querySelectorAll('.cd');grid.index = 0;
     sugg.items = suggestions(items);
@@ -644,7 +640,7 @@
   }
   function showQuery() {
     var heading = el.page.querySelector('.sq');
-    heading.textContent = view.query || 'Popularne wyszukiwania';
+    heading.textContent = view.query || 'Popular Searches';
     heading.classList.toggle('ph2', !view.query);
   }
   function setQuery(query, toResults) {
@@ -669,8 +665,8 @@
       for (var i = 0; i < Math.max(a.length, b.length); i++) { if (a[i]) out.push(a[i]); if (b[i]) out.push(b[i]); }
       return out;
     });
-    var extra = '<span style="font-size:20px;color:#fff">Wybierz preferencje</span><div class="dd" data-d="lang"><span>' + esc(choice.label) + '</span><i>' + icons.caret + '</i></div>';
-    return renderGrid(token, 'Przeglądaj według języka', promise, 'Brak tytułów w tym języku.', keepFocus, extra);
+    var extra = '<span style="font-size:20px;color:#fff">Choose a preference</span><div class="dd" data-d="lang"><span>' + esc(choice.label) + '</span><i>' + icons.caret + '</i></div>';
+    return renderGrid(token, 'Browse by Language', promise, 'No titles in this language.', keepFocus, extra);
   }
   function finishRender(keepFocus) {
     el.spin.classList.remove('on');
@@ -798,10 +794,10 @@
   }
   function metaHTML(item, data) {
     var parts = [];
-    parts.push(daysSince(item.date) < 45 ? '<span class="grn">Nowość</span>' : '<span class="grn">' + Math.max(50, Math.round(item.vote * 10)) + '% dopasowania</span>');
+    parts.push(daysSince(item.date) < 45 ? '<span class="grn">New</span>' : '<span class="grn">' + Math.max(50, Math.round(item.vote * 10)) + '% Match</span>');
     if (item.year) parts.push('<span>' + esc(item.year) + '</span>');
     if (data) {
-      if (item.type === 'tv' && data.number_of_seasons) parts.push('<span>' + data.number_of_seasons + ' ' + plural(data.number_of_seasons, 'sezon', 'sezony', 'sezonów') + '</span>');
+      if (item.type === 'tv' && data.number_of_seasons) parts.push('<span>' + data.number_of_seasons + ' ' + (data.number_of_seasons === 1 ? 'Season' : 'Seasons') + '</span>');
       if (item.type === 'movie' && data.runtime) parts.push('<span>' + duration(data.runtime) + '</span>');
     }
     parts.push('<span class="hd">HD</span>');
@@ -945,8 +941,8 @@
 
   function modalBase(item) {
     return '<div class="md"><div class="mh" style="background-image:url(\'' + image(item.backdrop, 'w1280') + '\')"><div class="x">' + icons.close + '</div>' +
-      '<div class="tp2"><div class="kick">' + logoMark() + (item.type === 'tv' ? 'Serial' : 'Film') + '</div><div class="art"><b>' + esc(item.title) + '</b></div></div>' +
-      '<div class="bs"><div class="tb white" data-a="0">' + icons.play + '<span>Odtwórz</span></div><div class="cb" data-a="1">' + (inList(item) ? icons.check : icons.plus) + '</div><div class="cb" data-a="2">' + icons.thumb + '</div></div><div class="mt2">' + icons.mute + '</div></div>' +
+      '<div class="tp2"><div class="kick">' + logoMark() + (item.type === 'tv' ? 'Series' : 'Movie') + '</div><div class="art"><b>' + esc(item.title) + '</b></div></div>' +
+      '<div class="bs"><div class="tb white" data-a="0">' + icons.play + '<span>Play</span></div><div class="cb" data-a="1">' + (inList(item) ? icons.check : icons.plus) + '</div><div class="cb" data-a="2">' + icons.thumb + '</div></div><div class="mt2">' + icons.mute + '</div></div>' +
       '<div class="mi"><div class="ml"><div class="meta">' + metaHTML(item, null) + '</div><p class="ms">' + esc(item.overview) + '</p></div><div class="mr"></div></div>' +
       '<div class="eps"></div><div class="sim"></div></div>';
   }
@@ -974,7 +970,7 @@
       el.mw.querySelector('.ms').textContent = item.overview || '';
       var art = el.mw.querySelector('.mh .art b');if (art) art.textContent = item.title;
       var play = el.mw.querySelector('[data-a="0"] span');
-      if (entry && entry.progress > 1) play.textContent = 'Wznów';
+      if (entry && entry.progress > 1) play.textContent = 'Resume';
       renderCast(m, data);
       if (item.type === 'tv') {
         m.seasons = (data.seasons || []).filter(function (s) { return s.season_number > 0 && s.episode_count > 0 && (!s.air_date || s.air_date <= today()); });
@@ -995,11 +991,11 @@
       if (modal !== m) return;
       var names = ((cast && cast.cast) || []).slice(0, 3).map(function (p) { return p.name; });
       var html = '';
-      if (names.length) html += '<p><span>Obsada: </span>' + esc(names.join(', ')) + '</p>';
+      if (names.length) html += '<p><span>Cast: </span>' + esc(names.join(', ')) + '</p>';
       var g = genreList(m.item, data);
-      if (g.length) html += '<p><span>Gatunki: </span>' + esc(g.join(', ')) + '</p>';
-      if (data.original_title && data.original_title !== m.item.title) html += '<p><span>Tytuł oryginalny: </span>' + esc(data.original_title) + '</p>';
-      if (data.original_name && data.original_name !== m.item.title) html += '<p><span>Tytuł oryginalny: </span>' + esc(data.original_name) + '</p>';
+      if (g.length) html += '<p><span>Genres: </span>' + esc(g.join(', ')) + '</p>';
+      if (data.original_title && data.original_title !== m.item.title) html += '<p><span>Original title: </span>' + esc(data.original_title) + '</p>';
+      if (data.original_name && data.original_name !== m.item.title) html += '<p><span>Original title: </span>' + esc(data.original_name) + '</p>';
       el.mw.querySelector('.mr').innerHTML = html;
       modalScroll();
     });
@@ -1013,16 +1009,16 @@
       if (m.wantEpisode) m.episodes.forEach(function (e, i) { if (e.episode_number === Number(m.wantEpisode)) current = i; });
       m.current = current;
       var season = m.seasons.filter(function (s) { return s.season_number === Number(m.season); })[0];
-      var label = season ? season.name || ('Sezon ' + season.season_number) : 'Sezon ' + m.season;
-      var head = '<div class="sec"><h2>Odcinki</h2>' + (m.seasons.length > 1 ? '<div class="dd" data-d="season"><span>' + esc(label) + '</span><i>' + icons.caret + '</i></div>' : '<em>' + esc(label) + '</em>') + '</div>';
+      var label = season ? season.name || ('Season ' + season.season_number) : 'Season ' + m.season;
+      var head = '<div class="sec"><h2>Episodes</h2>' + (m.seasons.length > 1 ? '<div class="dd" data-d="season"><span>' + esc(label) + '</span><i>' + icons.caret + '</i></div>' : '<em>' + esc(label) + '</em>') + '</div>';
       var html = '';
       m.episodes.forEach(function (e, i) {
         var pct = done[m.season + ':' + e.episode_number] || 0;
         html += '<div class="ei' + (i === current ? ' cur' : '') + '" data-e="' + i + '"><span class="en">' + e.episode_number + '</span>' +
           '<div class="et" style="background-image:url(\'' + image(e.still_path || m.item.backdrop, 'w300') + '\')">' + icons.bigPlay + (pct > 1 ? '<div class="pb2"><i style="width:' + Math.min(100, pct) + '%"></i></div>' : '') + '</div>' +
-          '<div class="ex"><div><span>' + esc(e.name || 'Odcinek ' + e.episode_number) + '</span><span>' + esc(duration(e.runtime)) + '</span></div><p>' + esc(e.overview) + '</p></div></div>';
+          '<div class="ex"><div><span>' + esc(e.name || 'Episode ' + e.episode_number) + '</span><span>' + esc(duration(e.runtime)) + '</span></div><p>' + esc(e.overview) + '</p></div></div>';
       });
-      if (!m.episodes.length) html = '<p class="empty" style="padding:0 52px">Odcinki tego sezonu nie są jeszcze dostępne.</p>';
+      if (!m.episodes.length) html = '<p class="empty" style="padding:0 52px">Episodes of this season are not available yet.</p>';
       el.mw.querySelector('.eps').innerHTML = head + html;
       if (m.wantZone === 'ep' && m.episodes.length) { m.zone = 'ep';m.ep = current;m.wantZone = null; }
       if (m.zone === 'ep') m.ep = Math.min(m.ep, Math.max(0, m.episodes.length - 1));
@@ -1038,10 +1034,10 @@
       if (modal !== m) return;
       m.similar = items;
       if (!items.length) return;
-      var html = '<div class="sec"><h2>Więcej podobnych</h2></div><div class="sg">';
+      var html = '<div class="sec"><h2>More Like This</h2></div><div class="sg">';
       items.forEach(function (item, i) {
         html += '<div class="sc" data-s="' + i + '"><div class="si" style="background-image:url(\'' + image(item.backdrop, 'w300') + '\')"><span class="tt">' + esc(item.title) + '</span></div>' +
-          '<div class="sm"><div class="meta">' + (daysSince(item.date) < 45 ? '<span class="grn">Nowość</span>' : '<span class="grn">' + Math.max(50, Math.round(item.vote * 10)) + '%</span>') + '<span>' + esc(item.year) + '</span><span class="hd">HD</span></div><div class="cb">' + (inList(item) ? icons.check : icons.plus) + '</div></div>' +
+          '<div class="sm"><div class="meta">' + (daysSince(item.date) < 45 ? '<span class="grn">New</span>' : '<span class="grn">' + Math.max(50, Math.round(item.vote * 10)) + '%</span>') + '<span>' + esc(item.year) + '</span><span class="hd">HD</span></div><div class="cb">' + (inList(item) ? icons.check : icons.plus) + '</div></div>' +
           '<p>' + esc(item.overview) + '</p></div>';
       });
       el.mw.querySelector('.sim').innerHTML = html + '</div>';
@@ -1142,7 +1138,7 @@
       return true;
     }
     if (m.zone === 'season') {
-      openList(m.seasons.map(function (s) { return (s.name || 'Sezon ' + s.season_number) + '  (' + s.episode_count + ' odc.)'; }),
+      openList(m.seasons.map(function (s) { return (s.name || 'Season ' + s.season_number) + '  (' + s.episode_count + ' ep.)'; }),
         Math.max(0, m.seasons.map(function (s) { return s.season_number; }).indexOf(Number(m.season))), modalNode(), function (index) {
           m.season = m.seasons[index].season_number;m.wantEpisode = null;m.ep = 0;m.current = 0;
           loadEpisodes(m);
@@ -1265,7 +1261,7 @@
       header.id = 'rive-page-hdr';
       var html = logo + '<nav>';
       NAV.forEach(function (item) { html += '<a href="/" data-s="' + item.id + '">' + esc(item.label) + '</a>'; });
-      html += '</nav><div class="tl"><a href="/search" data-s="search" class="ic" aria-label="Szukaj">' + icons.search + '</a><span class="av on"><b></b></span></div>';
+      html += '</nav><div class="tl"><a href="/search" data-s="search" class="ic" aria-label="Search">' + icons.search + '</a><span class="av on"><b></b></span></div>';
       header.innerHTML = html;
       header.addEventListener('click', function (event) {
         var link = event.target.closest('a[data-s]');

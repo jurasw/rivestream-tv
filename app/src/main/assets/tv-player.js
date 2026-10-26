@@ -96,22 +96,22 @@
     '<div class="sub"><span></span></div>' +
     '<div class="spin"><svg viewBox="0 0 72 72" fill="none"><circle cx="36" cy="36" r="33" stroke="rgba(255,255,255,.15)" stroke-width="6"/><path d="M36 3A33 33 0 0 1 69 36" stroke="#e50914" stroke-width="6" stroke-linecap="round"/></svg></div>' +
     '<div class="intro off"><p></p><p></p></div>' +
-    '<div class="paused off"><div class="text"><p class="eyebrow">Oglądasz</p><p class="big"></p><p class="sub2"></p><p class="epl"></p><p class="desc"></p></div><p class="label">Wstrzymano</p></div>' +
+    '<div class="paused off"><div class="text"><p class="eyebrow">You’re watching</p><p class="big"></p><p class="sub2"></p><p class="epl"></p><p class="desc"></p></div><p class="label">Paused</p></div>' +
     '<div class="chrome off"><div class="scrim-top"></div>' +
-    '<div class="top"><div class="b ab" data-f="exit">' + icons.arrow + '</div><div class="tb ghost" data-f="site">Serwery</div></div>' +
+    '<div class="top"><div class="b ab" data-f="exit">' + icons.arrow + '</div><div class="tb ghost" data-f="site">Servers</div></div>' +
     '<div class="bottom"><div class="scrim-bottom"></div>' +
     '<div class="progress"><div class="line"><div class="track"><i class="buf"></i><i class="played"></i></div><div class="thumb"><i></i></div><div class="scrub"><div></div><span></span></div></div><span class="time"></span></div>' +
     '<div class="row"><div class="left"><div class="b ib" data-f="play">' + icons.play + '</div><div class="b ib" data-f="rewind">' + icons.back10 + '</div><div class="b ib" data-f="forward">' + icons.fwd10 + '</div><div class="b ib" data-f="volume">' + icons.volume + '</div></div>' +
     '<div class="title"><b></b> <span></span></div>' +
     '<div class="right"><div class="pair"><div class="b ib" data-f="next">' + icons.next + '</div><div class="b ib" data-f="episodes">' + icons.episodes + '</div></div><div class="pair"><div class="b ib" data-f="tracks">' + icons.subtitles + '</div><div class="b ib" data-f="speed">' + icons.speed + '</div></div></div></div>' +
-    '<div class="panel nextp"><header><span class="h">Następny odcinek</span><div><div class="tb white" data-p="go"><i></i>' + icons.triangle + '<span>Następny odcinek</span></div><div class="tb grey" data-p="cancel">Anuluj</div></div></header>' +
+    '<div class="panel nextp"><header><span class="h">Next episode</span><div><div class="tb white" data-p="go"><i></i>' + icons.triangle + '<span>Next episode</span></div><div class="tb grey" data-p="cancel">Cancel</div></div></header>' +
     '<div class="body"><div class="still">' + icons.bigPlay + '</div><div class="meta"><p class="num"><span></span><span></span></p><p class="syn"></p></div></div></div>' +
     '<div class="panel eps"><header><span class="h"></span><span></span></header><div class="view"><div class="list"></div></div></div>' +
-    '<div class="panel tracks"><div class="col"><header>Audio</header><div class="view"><div class="list"></div></div></div><div class="col"><header>Napisy</header><div class="view"><div class="list"></div></div></div></div>' +
-    '<div class="panel speed"><span class="h">Prędkość odtwarzania</span><div class="rail"></div></div>' +
+    '<div class="panel tracks"><div class="col"><header>Audio</header><div class="view"><div class="list"></div></div></div><div class="col"><header>Subtitles</header><div class="view"><div class="list"></div></div></div></div>' +
+    '<div class="panel speed"><span class="h">Playback speed</span><div class="rail"></div></div>' +
     '<div class="panel vol"><div class="vt"><div class="vf"></div><div class="vk"></div></div></div>' +
     '</div></div>' +
-    '<div class="err"><p>Nie udało się odtworzyć wideo</p><span>To źródło nie odpowiada. Wybierz inny serwer.</span><div><div class="tb white" data-e="site">Serwery</div><div class="tb grey" data-e="exit">Wróć</div></div></div>' +
+    '<div class="err"><p>Could not play the video</p><span>This source is not responding. Choose another server.</span><div><div class="tb white" data-e="site">Servers</div><div class="tb grey" data-e="exit">Back</div></div></div>' +
     '</div>';
   var documentStyle = '@font-face{font-family:"Rive Inter";src:url("https://rivetv.assets/fonts/Inter-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}' +
     'html[data-rive-player] body *:not([data-rive-main]):not([id^="rive-"]){visibility:hidden!important;pointer-events:none!important}' +
@@ -304,7 +304,7 @@
     introShown = true;
     var lines = el.intro.querySelectorAll('p');
     lines[0].textContent = view.type === 'tv' ? view.title : '';
-    lines[1].textContent = view.type === 'tv' ? 'Odc. ' + view.episode + (view.episodeTitle ? ' „' + view.episodeTitle + '”' : '') : view.title;
+    lines[1].textContent = view.type === 'tv' ? 'Ep. ' + view.episode + (view.episodeTitle ? ' „' + view.episodeTitle + '”' : '') : view.title;
     el.intro.className = 'intro on';
     clearTimeout(introTimer);introTimer = setTimeout(function () {el.intro.className = 'intro off';},4500);
   }
@@ -313,8 +313,8 @@
     if (!host) return;
     if (on && view) {
       el.paused.querySelector('.big').textContent = view.title || '';
-      el.paused.querySelector('.sub2').textContent = view.type === 'tv' ? 'Sezon ' + view.season : (view.tagline || '');
-      el.paused.querySelector('.epl').textContent = view.type === 'tv' ? 'Odcinek ' + view.episode + (view.episodeTitle ? ': ' + view.episodeTitle : '') : '';
+      el.paused.querySelector('.sub2').textContent = view.type === 'tv' ? 'Season ' + view.season : (view.tagline || '');
+      el.paused.querySelector('.epl').textContent = view.type === 'tv' ? 'Episode ' + view.episode + (view.episodeTitle ? ': ' + view.episodeTitle : '') : '';
       el.paused.querySelector('.desc').textContent = view.synopsis || '';
     }
     el.paused.className = 'paused ' + (on ? 'on' : 'off');
@@ -354,7 +354,7 @@
     el.chrome.className = 'chrome ' + (visible ? 'on' : 'off') + (compact ? ' compact' : '') + (panel ? ' paneled' : '');
     el.sub.classList.toggle('up',visible && !compact);
     el.title.querySelector('b').textContent = view ? view.title || '' : '';
-    el.title.querySelector('span').textContent = view && view.type === 'tv' ? 'Odc. ' + view.episode + (view.episodeTitle ? '  ' + view.episodeTitle : '') : '';
+    el.title.querySelector('span').textContent = view && view.type === 'tv' ? 'Ep. ' + view.episode + (view.episodeTitle ? '  ' + view.episodeTitle : '') : '';
     [['next',el.nextp],['episodes',el.eps],['tracks',el.tracks],['speed',el.speed],['volume',el.vol]].forEach(function (pair) {pair[1].classList.toggle('open',visible && panel === pair[0]);});
     if (panel === 'next') renderNext();
     if (panel === 'episodes') renderEpisodes();
@@ -588,7 +588,7 @@
     var next = view && view.next || {};
     var go = el.nextp.querySelector('[data-p="go"]'), cancel = el.nextp.querySelector('[data-p="cancel"]');
     var auto = !nextPreview && next.eligible && next.auto && typeof next.remaining === 'number';
-    var label = auto ? 'Następny odcinek za ' + next.remaining + ' s' : 'Następny odcinek';
+    var label = auto ? 'Next episode in ' + next.remaining + ' s' : 'Next episode';
     if (go.querySelector('span').textContent !== label) go.querySelector('span').textContent = label;
     go.className = 'tb ' + (auto ? 'count' : 'white');
     go.querySelector('i').style.transform = 'scaleX(' + (auto ? clamp((15 - next.remaining) / 15,0,1) : 0) + ')';
@@ -596,22 +596,22 @@
     if (!auto) nextFocus = 0;
     var num = el.nextp.querySelectorAll('.num span');
     num[0].textContent = next.episode ? String(next.episode) : '';
-    num[1].textContent = next.title || (next.episode ? 'Odcinek ' + next.episode : '');
-    el.nextp.querySelector('.syn').textContent = next.synopsis || (next.season && view && String(next.season) !== String(view.season) ? 'Sezon ' + next.season : '');
+    num[1].textContent = next.title || (next.episode ? 'Episode ' + next.episode : '');
+    el.nextp.querySelector('.syn').textContent = next.synopsis || (next.season && view && String(next.season) !== String(view.season) ? 'Season ' + next.season : '');
     var still = el.nextp.querySelector('.still');
     if (still.getAttribute('data-image') !== (next.still || '')) {still.setAttribute('data-image',next.still || '');still.style.backgroundImage = next.still ? 'url("' + next.still + '")' : '';}
   }
   function renderEpisodes() {
     var list = view && view.episodes || [], box = el.eps.querySelector('.list');
     var heads = el.eps.querySelectorAll('header span');
-    heads[0].textContent = view ? view.title || '' : '';heads[1].textContent = view ? 'Sezon ' + view.season : '';
+    heads[0].textContent = view ? view.title || '' : '';heads[1].textContent = view ? 'Season ' + view.season : '';
     var signature = list.map(function (item) {return item.episode + ':' + item.title + ':' + item.progress;}).join('|');
     if (box.getAttribute('data-signature') !== signature) {
       box.setAttribute('data-signature',signature);box.textContent = '';
       list.forEach(function (item) {
         var row = document.createElement('div');row.className = 'ep' + (String(item.episode) === String(view.episode) ? ' cur' : '');
         row.innerHTML = '<div class="r1"><span></span><span></span><span class="bar"><i></i></span></div><div class="r2"><div class="still">' + icons.bigPlay + '</div><p class="syn"></p></div>';
-        var spans = row.querySelectorAll('.r1 span');spans[0].textContent = String(item.episode);spans[1].textContent = item.title || 'Odcinek ' + item.episode;
+        var spans = row.querySelectorAll('.r1 span');spans[0].textContent = String(item.episode);spans[1].textContent = item.title || 'Episode ' + item.episode;
         row.querySelector('.bar i').style.transform = 'scaleX(' + clamp(item.progress || 0,0,1) + ')';
         row.querySelector('.syn').textContent = item.synopsis || '';
         row.setAttribute('data-image',item.still || '');
@@ -646,7 +646,7 @@
         item.innerHTML = icons.check;item.appendChild(document.createTextNode(label));
         box.appendChild(item);
       });
-      var hint = col ? view && view.subtitleNote : source.items.some(function (name) {return / — szukaj serwera$/.test(name);}) ? 'Ten serwer nie ma tej wersji językowej. Wybierz ją, a poszukam jej na innych serwerach.' : '';
+      var hint = col ? view && view.subtitleNote : source.items.some(function (name) {return / — find a server$/.test(name);}) ? 'This server does not have that language. Choose it and I will look on other servers.' : '';
       if (hint) {var note = document.createElement('div');note.className = 'note';note.textContent = hint;box.appendChild(note);}
       scrollList(box,col === panelCol ? box.children[panelIndex] : null,486);
     });
@@ -665,7 +665,7 @@
   function label(name,language,index) {
     var plain = text(name,60), code = text(language,8).toLowerCase().split(/[-_]/)[0];
     if (code && (!plain || /^[a-z]+$/i.test(plain))) {var local = languageName(code,'');if (local) return local;}
-    return plain || text(language,20) || 'Ścieżka ' + (index + 1);
+    return plain || text(language,20) || 'Track ' + (index + 1);
   }
   function jw() {
     try {
@@ -685,7 +685,7 @@
     return hls && Array.isArray(hls.audioTracks) ? hls : null;
   }
   function audioSource() {
-    var empty = {items:['Oryginalne'],current:0,select:function () {}};
+    var empty = {items:['Original'],current:0,select:function () {}};
     if (!video) return empty;
     try {
       var native = video.audioTracks;
@@ -727,7 +727,7 @@
     ['en','ja'].forEach(function (code) {
       if (!langs.some(function (value) {return AUDIO_MATCH[code].test(value.trim());})) extra.push(code);
     });
-    return {items:source.items.concat(extra.map(function (code) {return languageName(code,code) + ' — szukaj serwera';})),current:source.current,select:function (index) {
+    return {items:source.items.concat(extra.map(function (code) {return languageName(code,code) + ' — find a server';})),current:source.current,select:function (index) {
       if (index < source.items.length) {source.select(index);return;}
       act('findAudio',{value:extra[index - source.items.length]});
       closePanel();hideControls();
@@ -771,11 +771,11 @@
     var player = jwCaptions();
     if (player) {
       var captions = player.getCaptionsList();
-      return {items:['Wyłączone'].concat(captions.slice(1).map(function (track,index) {return label(track.label,track.language,index);})),
+      return {items:['Off'].concat(captions.slice(1).map(function (track,index) {return label(track.label,track.language,index);})),
         current:player.getCurrentCaptions() || 0,select:function (index) {player.setCurrentCaptions(index);}};
     }
     var tracks = textTracks();
-    return {items:['Wyłączone'].concat(tracks.map(function (track,index) {return label(track.label,track.language,index);})),
+    return {items:['Off'].concat(tracks.map(function (track,index) {return label(track.label,track.language,index);})),
       current:subTrack ? tracks.indexOf(subTrack) + 1 : 0,select:function (index) {chooseText(index ? tracks[index - 1] : null);}};
   }
   function chooseText(track) {
@@ -911,7 +911,7 @@
   var subtitleSearch = {route:'',items:[]}, LANGUAGE_RANK = ['pl','en'];
   function languageName(code,fallback) {
     try {
-      var name = code && new Intl.DisplayNames(['pl'],{type:'language'}).of(code);
+      var name = code && new Intl.DisplayNames(['en'],{type:'language'}).of(code);
       if (name && name !== code) return name.charAt(0).toUpperCase() + name.slice(1);
     } catch (_) {}
     return fallback;
@@ -920,16 +920,16 @@
     var key = playback().subtitleKey ? playback().subtitleKey() : '';
     var route = [info.type,info.id,info.season,info.episode,key].join(':');
     if (subtitleSearch.route === route) return subtitleSearch.items;
-    var search = subtitleSearch = {route:route,items:[],note:'Szukam napisów…'};
-    if (!key) {search.note = 'Dodaj klucz Wyzie w Ustawieniach, żeby zobaczyć więcej napisów.';return search.items;}
+    var search = subtitleSearch = {route:route,items:[],note:'Looking for subtitles…'};
+    if (!key) {search.note = 'Add a Wyzie key in Settings to see more subtitles.';return search.items;}
     var url = 'https://sub.wyzie.io/search?id=' + encodeURIComponent(info.id) + (info.type === 'tv' ? '&season=' + encodeURIComponent(info.season) + '&episode=' + encodeURIComponent(info.episode) : '') + '&key=' + encodeURIComponent(key);
     fetch(url).then(function (response) {
-      if (response.status === 401 || response.status === 403) search.note = 'Nieprawidłowy klucz Wyzie. Sprawdź go w Ustawieniach.';
+      if (response.status === 401 || response.status === 403) search.note = 'Invalid Wyzie key. Check it in Settings.';
       return response.ok ? response.json() : [];
     }).then(function (list) {
       if (subtitleSearch !== search) return;
-      if (!Array.isArray(list)) {if (search.note === 'Szukam napisów…') search.note = 'Nie udało się pobrać listy napisów.';return;}
-      if (search.note === 'Szukam napisów…') search.note = list.length ? '' : 'Brak napisów dla tego odcinka.';
+      if (!Array.isArray(list)) {if (search.note === 'Looking for subtitles…') search.note = 'Could not load the subtitles list.';return;}
+      if (search.note === 'Looking for subtitles…') search.note = list.length ? '' : 'No subtitles for this episode.';
       var seen = {};
       list.forEach(function (entry) {
         if (!entry || typeof entry.url !== 'string' || entry.url.indexOf('https://') !== 0) return;
@@ -942,10 +942,10 @@
       });
       search.items.sort(function (a,b) {
         var ra = LANGUAGE_RANK.indexOf(a.code), rb = LANGUAGE_RANK.indexOf(b.code);
-        return (ra === -1 ? 9 : ra) - (rb === -1 ? 9 : rb) || a.label.localeCompare(b.label,'pl');
+        return (ra === -1 ? 9 : ra) - (rb === -1 ? 9 : rb) || a.label.localeCompare(b.label,'en');
       });
       search.items = search.items.slice(0,40);
-    }).catch(function () {if (subtitleSearch === search) search.note = 'Nie udało się pobrać listy napisów.';});
+    }).catch(function () {if (subtitleSearch === search) search.note = 'Could not load the subtitles list.';});
     return search.items;
   }
   function decodeSubtitles(buffer,encoding) {

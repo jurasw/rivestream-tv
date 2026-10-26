@@ -28,13 +28,13 @@ public final class UpdateResultReceiver extends BroadcastReceiver {
         if(session>=0&&prefs.getInt("session_id",-1)!=session)return;
         if(status==PackageInstaller.STATUS_PENDING_USER_ACTION){
             Intent screen=new Intent(context,UpdateInstallActivity.class).setAction(AppUpdater.STATUS_ACTION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtras(intent);
-            try{context.startActivity(screen);}catch(RuntimeException missing){Log.w("RiveUpdate","Installer confirmation unavailable",missing);defer(context,target,"Otwórz Rivestream TV, aby ponowić aktualizację w menu.");}
-        }else defer(context,target,status==PackageInstaller.STATUS_FAILURE_ABORTED?"Aktualizacja odłożona. Możesz wrócić do niej w menu.":"Aktualizacja nie została zainstalowana. Spróbuj ponownie w menu.");
+            try{context.startActivity(screen);}catch(RuntimeException missing){Log.w("RiveUpdate","Installer confirmation unavailable",missing);defer(context,target,"Open Rivestream TV to retry the update from the menu.");}
+        }else defer(context,target,status==PackageInstaller.STATUS_FAILURE_ABORTED?"Update postponed. You can return to it from the menu.":"The update was not installed. Try again from the menu.");
     }
     static void complete(Context context){
         SharedPreferences prefs=context.getSharedPreferences(AppUpdater.PREFS,Context.MODE_PRIVATE);
         boolean first=prefs.getInt("completed_version",0)!=BuildConfig.VERSION_CODE;
-        String message="Zaktualizowano Rivestream TV do wersji "+BuildConfig.VERSION_NAME+".";
+        String message="Rivestream TV updated to version "+BuildConfig.VERSION_NAME+".";
         SharedPreferences.Editor edit=prefs.edit().remove("ready_json").remove("deferred_version").remove("session_id").remove("session_started").remove("session_target").putInt("completed_version",BuildConfig.VERSION_CODE);
         if(first)edit.putString("completion_message",message);edit.apply();
         new java.io.File(context.getFilesDir(),"updates/ready.apk").delete();
@@ -42,7 +42,7 @@ public final class UpdateResultReceiver extends BroadcastReceiver {
         if(!first)return;
         if(Build.VERSION.SDK_INT<29){
             try{context.startActivity(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));}catch(RuntimeException blocked){Toast.makeText(context,message,Toast.LENGTH_LONG).show();}
-        }else Toast.makeText(context,message+" Otwórz aplikację z menu TV.",Toast.LENGTH_LONG).show();
+        }else Toast.makeText(context,message+" Open the app from the TV menu.",Toast.LENGTH_LONG).show();
     }
     static void markDeferred(Context context,int target){
         context.getSharedPreferences(AppUpdater.PREFS,Context.MODE_PRIVATE).edit().putInt("deferred_version",target).remove("session_id").remove("session_started").remove("session_target").apply();

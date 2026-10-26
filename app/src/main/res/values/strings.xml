@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="source_servers">Serwery</string>
-    <string name="source_blocked">To źródło wymaga weryfikacji dostawcy. Wybierz inny serwer.</string>
-    <string name="source_captcha">Serwer wymaga weryfikacji (%1$s). Wybierz Kursor i rozwiąż ją pilotem albo wybierz inny serwer.</string>
-    <string name="error_refresh">Odśwież</string>
-    <string name="update_installing">Instaluję aktualizację Rivestream TV…</string>
+    <string name="source_servers">Servers</string>
+    <string name="source_blocked">This source needs provider verification. Choose another server.</string>
+    <string name="source_captcha">The server needs verification (%1$s). Select Cursor and solve it with the remote, or choose another server.</string>
+    <string name="error_refresh">Refresh</string>
+    <string name="update_installing">Installing the Rivestream TV update…</string>
 </resources>

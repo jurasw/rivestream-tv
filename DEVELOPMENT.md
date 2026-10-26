@@ -28,6 +28,10 @@ Napisy strony pochodziły z `subs.1shows.app`, którego domena już nie istnieje
 
 „Preferowany język audio” (japoński, angielski, polski) wybiera pasującą ścieżkę, gdy strumień ma kilka (natywne `audioTracks`, hls.js, JW Player, Video.js). Wyszukiwanie serwera pomija serwer, którego ścieżki są oznaczone tylko innym językiem; gdy żaden nie pasuje, wraca do pierwszego działającego. Serwer bez oznaczenia języka jest akceptowany po 2,5 s, bo nie da się go rozpoznać. Serwery strony nie podają języka w nazwie, więc skuteczność zależy od tego, czy dostawca oznacza ścieżki.
 
+Od 1.9.5 cały interfejs aplikacji jest po angielsku (powłoka, odtwarzacz, ustawienia, menu pilota, aktualizacje), a dane TMDB są pobierane jako `en-US`. Zapisana polska nazwa języka napisów jest przy wczytaniu zamieniana na angielską.
+
+Od 1.9.5 drugie „Wstecz” w ciągu 5 s na `/watch` zawsze wychodzi z filmu, także gdy odtwarzacz serwera sam chowa kontrolki albo nie przyjmuje klawisza. Pierwsze naciśnięcie dalej pokazuje kontrolki lub zamyka panel.
+
 Od 1.9.4 kolumna „Audio” dopisuje angielski i japoński, których nie ma na bieżącym serwerze („Angielski — szukaj serwera”). Wybór zapisuje preferencję i sprawdza do 10 innych serwerów; przyjmuje tylko ścieżkę oznaczoną tym językiem, a bez trafienia wraca do poprzedniego serwera z komunikatem. Ramka odtwarzacza zgłasza języki ścieżek w `RiveTVPlayer.status().langs`.
 
 Od 1.9.3 panel „Audio / Napisy” to wyskakująca karta przy przycisku: ciemne zaokrąglone tło bez gradientu, dwie kolumny, znacznik przy wybranej opcji i białe zaznaczenie fokusu. Nazwy języków ścieżek są po polsku, gdy ścieżka podaje kod języka.
