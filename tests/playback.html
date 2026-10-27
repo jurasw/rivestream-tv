@@ -86,6 +86,17 @@
   check('pause at time zero survives autostart ticks',paused&&time===0);
   RiveTVPlayback.command('toggle');check('second toggle resumes at time zero',!paused&&time===0);
   check('removed intro command is ignored',RiveTVPlayback.command('intro')===false&&time===0);
+  video.remove();var reused=document.createElement('video'),reusedSrc='blob:episode-1',reusedTime=600;
+  Object.defineProperties(reused,{duration:{get:()=>1400},currentTime:{get:()=>reusedTime,set:v=>reusedTime=v},paused:{get:()=>false},ended:{get:()=>false},readyState:{get:()=>4},currentSrc:{get:()=>reusedSrc}});
+  reused.play=()=>Promise.resolve();reused.pause=()=>{};
+  history.replaceState({},'', '/watch?type=tv&id=9&season=1&episode=1');document.body.appendChild(reused);step(6);
+  history.replaceState({},'', '/watch?type=tv&id=9&season=1&episode=2');step(6);
+  var reusedProgress=JSON.parse(localStorage.getItem('RiveTVProgress'));
+  check('reused player does not save the previous episode time into a new episode',reusedProgress['tv:9:1:1'].time===600&&!reusedProgress['tv:9:1:2']&&reusedTime===600);
+  reusedSrc='blob:episode-2';reusedTime=0;step();reusedTime=30;step(6);
+  reusedProgress=JSON.parse(localStorage.getItem('RiveTVProgress'));
+  check('new episode source saves its own progress',reusedProgress['tv:9:1:2'].time===30&&reusedProgress['tv:9:1:1'].time===600);
+  reused.remove();
   Date.now=realNow;
   var wait=ms=>new Promise(r=>setTimeout(r,ms));
   function probe(frame){return new Promise(resolve=>{var done=e=>{if(e.source===frame.contentWindow&&e.data&&e.data.fixture==='probe'){removeEventListener('message',done);resolve(e.data);}};addEventListener('message',done);frame.contentWindow.postMessage({fixture:'probe'},'*');setTimeout(()=>resolve({}),1500);});}
