@@ -2,7 +2,7 @@
   'use strict';
   if (window.RiveTVPlayback) return;
   var root = window === window.top;
-  var context = null, route = '', videos = new WeakMap(), clicked = new WeakSet();
+  var context = null, route = '', videos = new WeakMap(), clicked = new WeakSet(), stale = new WeakMap();
   var started = false, controls = false, hideTimer, lastSaved = 0;
   var nextPanel, nextSettings, nextState = null, nextCountdown = 0, nextCancelled = false, advancing = false;
   var nextPreferences = {autoNext:false,outroSeconds:90,subtitles:null,subtitleKey:'',audioLanguage:''}, nextView = {eligible:false};
@@ -164,6 +164,8 @@
       localStorage.setItem('RiveStreamContinueWatching',JSON.stringify(continuing));
     } catch (_) {}
   }
+  function source(video) {return video.currentSrc || video.src || '';}
+  function markStale() {document.querySelectorAll('video').forEach(function (video) {if (videos.get(video) && source(video)) stale.set(video,source(video));});}
   function report(video,force) {
     if (!context || !video || !videos.get(video) || !videos.get(video).restored) return;
     if (videos.get(video).session !== context.session) return;
@@ -186,6 +188,7 @@
     var next = location.pathname + location.search;
     if (next === route) return;
     // Context is immutable per route, so late events cannot save into the next episode.
+    if (context) markStale();
     route = next;context = null;started = false;videos = new WeakMap();clicked = new WeakSet();
     nextState = null;nextCountdown = 0;nextCancelled = false;advancing = false;lastSaved = 0;
     if (nextPanel) nextPanel.hidden = true;
@@ -220,6 +223,7 @@
     if (!root && event.source === window.parent) {
       if (msg.riveTV === 'context' && msg.context) {
         if (!context || context.session !== msg.context.session) {
+          if (context) markStale();
           context = msg.context;videos = new WeakMap();clicked = new WeakSet();started = false;setControls(msg.visible);
         }
         sendChildren(msg);
@@ -237,6 +241,7 @@
     if (!style.isConnected) (document.head || document.documentElement).appendChild(style);
     sendChildren({riveTV:'context',context:context,visible:controls});
     document.querySelectorAll('video').forEach(function (video) {
+      if (stale.has(video)) {if (stale.get(video) === source(video)) return;stale.delete(video);}
       var state = videos.get(video);
       if (!state) {
         state = {restored:false,attempts:0,session:context.session};videos.set(video,state);

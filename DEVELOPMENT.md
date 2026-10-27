@@ -28,6 +28,8 @@ Napisy strony pochodziły z `subs.1shows.app`, którego domena już nie istnieje
 
 „Preferowany język audio” (japoński, angielski, polski) wybiera pasującą ścieżkę, gdy strumień ma kilka (natywne `audioTracks`, hls.js, JW Player, Video.js). Wyszukiwanie serwera pomija serwer, którego ścieżki są oznaczone tylko innym językiem; gdy żaden nie pasuje, wraca do pierwszego działającego. Serwer bez oznaczenia języka jest akceptowany po 2,5 s, bo nie da się go rozpoznać. Serwery strony nie podają języka w nazwie, więc skuteczność zależy od tego, czy dostawca oznacza ścieżki.
 
+Od 1.9.6 przełączenie odcinka w tym samym odtwarzaczu nie zapisuje już pozycji poprzedniego odcinka pod nowym. Element `<video>`, który grał poprzedni odcinek, jest pomijany, dopóki nie zmieni źródła. Wcześniej strona wznawiała nowy odcinek od czasu poprzedniego.
+
 Od 1.9.5 cały interfejs aplikacji jest po angielsku (powłoka, odtwarzacz, ustawienia, menu pilota, aktualizacje), a dane TMDB są pobierane jako `en-US`. Zapisana polska nazwa języka napisów jest przy wczytaniu zamieniana na angielską.
 
 Od 1.9.5 drugie „Wstecz” w ciągu 5 s na `/watch` zawsze wychodzi z filmu, także gdy odtwarzacz serwera sam chowa kontrolki albo nie przyjmuje klawisza. Pierwsze naciśnięcie dalej pokazuje kontrolki lub zamyka panel.
@@ -38,7 +40,7 @@ Od 1.9.3 panel „Audio / Napisy” to wyskakująca karta przy przycisku: ciemne
 
 Od 1.9.1 panel „Audio / Napisy” mówi, czemu lista jest krótka: brak lub nieprawidłowy klucz Wyzie, brak napisów dla odcinka, błąd pobierania albo jedna ścieżka audio na serwerze.
 
-Testy: `scripts/test-playback.sh` (71 kontroli odtwarzacza, w tym napisy Wyzie z podstawionym API, 23 reklam i 4 wyszukiwania serwera po języku audio w `tests/servers.html`).
+Testy: `scripts/test-playback.sh` (73 kontroli odtwarzacza, w tym napisy Wyzie z podstawionym API, 23 reklam i 4 wyszukiwania serwera po języku audio w `tests/servers.html`).
 
 ## Wersja 1.8.0 — bez menu bocznego, wyszukiwanie jak w Netflix
 
