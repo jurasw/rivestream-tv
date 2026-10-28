@@ -18,7 +18,7 @@
   var widgets = '.cf-turnstile,.h-captcha,.g-recaptcha,iframe[src*="challenges.cloudflare.com"],iframe[src*="hcaptcha.com"],iframe[src*="/recaptcha"]';
   var keep = 'video,[id^="rive-"],.spla,.server-menu-item,button[aria-label="Play"],.vjs-big-play-button,.jw-display-icon-container,' + widgets;
   var player = '.jwplayer,.plyr,media-player,.video-js,.art-video-player,[id^="rive-"]';
-  var players = new WeakSet(), seen = new WeakMap(), suspects = new WeakMap(), removed = 0, blocked = 0, captcha = null, captchaSeen = 0;
+  var players = new WeakSet(), seen = new WeakMap(), suspects = new WeakMap(), hidden = new WeakSet(), prints = [], removed = 0, blocked = 0, captcha = null, captchaSeen = 0;
   var points = [[.5,.5],[.25,.25],[.75,.25],[.25,.75],[.75,.75]];
   function frameOf(source) {
     return Array.prototype.find.call(document.querySelectorAll('iframe'),function (f) {return f.contentWindow === source;});
@@ -52,6 +52,31 @@
     if (!root && count) window.parent.postMessage({riveTV:type,count:count},'*');
   }
   function remove(el) {el.remove();tally('adRemoved',1);}
+  var guard = new MutationObserver(function (records) {
+    records.forEach(function (record) {
+      var style = record.target.style;
+      if (style.getPropertyValue('display') !== 'none' || style.getPropertyPriority('display') !== 'important') style.setProperty('display','none','important');
+    });
+  });
+  function print(el) {return el.textContent.replace(/\d+/g,'#').replace(/\s+/g,' ').trim().slice(0,160);}
+  function hide(el) {
+    el.style.setProperty('display','none','important');
+    if (hidden.has(el)) return;
+    hidden.add(el);tally('adRemoved',1);
+    guard.observe(el,{attributes:true,attributeFilter:['style','class','hidden']});
+    var value = print(el);
+    if (prints.indexOf(value) === -1) prints = prints.concat(value).slice(-20);
+  }
+  function scams(fast) {
+    if (!document.body || Date.now() - captchaSeen < 5000) return;
+    overlays(0,.15).forEach(function (el) {
+      if (hidden.has(el) || protectedOverlay(el,true) || !scam.test(el.textContent)) return;
+      if (prints.indexOf(print(el)) !== -1) {hide(el);return;}
+      if (fast) return;
+      var count = (suspects.get(el) || 0) + 1;suspects.set(el,count);
+      if (count >= 2) hide(el);
+    });
+  }
   function relay(message) {
     document.querySelectorAll('iframe').forEach(function (frame) {
       try { frame.contentWindow.postMessage(message,'*'); } catch (_) {}
@@ -96,11 +121,7 @@
     var found = widget();
     if (found) report(found);
     var verifying = Date.now() - captchaSeen < 5000;
-    overlays(0,.15).forEach(function (el) {
-      if (verifying || protectedOverlay(el,true) || !scam.test(el.textContent)) return;
-      var count = (suspects.get(el) || 0) + 1;suspects.set(el,count);
-      if (count >= 2) remove(el);
-    });
+    scams(false);
     if (root) return;
     sweep();
     if (verifying) return;
@@ -163,5 +184,6 @@
       return captcha && Date.now() - captcha.at < 3500 ? JSON.stringify(captcha) : null;
     }
   };
+  new MutationObserver(function () {if (prints.length) scams(true);}).observe(document,{childList:true,subtree:true,characterData:true});
   setInterval(scan,1000);
 })();

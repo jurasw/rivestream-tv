@@ -46,7 +46,13 @@
   check('verification frame is not dropped as an ad frame',gate.isConnected);
   var fake=document.createElement('div');fake.id='qrscam';fake.style.cssText='position:fixed;inset:0;z-index:50;background:#fff';fake.textContent='Scan the QR code to prove you are not a robot';
   document.body.appendChild(fake);await wait(3500);
-  check('fake QR robot check is removed',!document.getElementById('qrscam'));
+  check('fake QR robot check is hidden',getComputedStyle(fake).display==='none');
+  fake.style.display='block';await wait(30);
+  check('hidden QR robot check cannot show itself again',getComputedStyle(fake).display==='none');
+  fake.remove();var again=document.createElement('div');again.style.cssText='position:fixed;inset:0;z-index:50;background:#fff';again.textContent='Scan the QR code to prove you are not a robot';
+  document.body.appendChild(again);await wait(50);
+  check('re-added QR robot check is hidden before the next scan',getComputedStyle(again).display==='none');
+  again.remove();
  } catch (error) {results.push('FAIL '+error.stack);}
  document.querySelector('#result').textContent=results.join('\n')+'\nTOTAL '+count;
 })();
